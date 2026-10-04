@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "retro-quest",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public/",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "retro-quest-db",
+      "database_id": "REPLACE_WITH_YOUR_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "SITE_NAME": "Retro Quest Arcade",
+    "MAIL_FROM_EMAIL": "hello@example.com",
+    "MAIL_FROM_NAME": "Retro Quest Arcade",
+    "ADMIN_EMAILS": "cp@strategico.co.za",
+    "CURRENCY": "usd",
+    "STRIPE_AUTOMATIC_TAX": "0",
+    "DEV_MODE": "0"
+  }
+  // Secrets (set with `npx wrangler secret put NAME`, never in this file):
+  //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAILTRAP_TOKEN
+  // Optional secret/var: MAILTRAP_INBOX_ID  -> sends to your Mailtrap test inbox instead of real people
+}

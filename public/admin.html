@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retro Quest Admin</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: back-office console. Same arcade palette as the game, calmer: one accent, dense tables, summary first. */
+:root {
+  --bg: #120f22; --panel: #1c1735; --panel-2: #251f45; --line: #3b3266; --ink: #f2eeff; --muted: #a99fcf;
+  --accent: #55ffff; --pink: #ff55ff; --good: #55ff55; --warn: #ffff55; --bad: #ff5555;
+  --font-display: "Pixelify Sans", "Courier New", monospace;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 0 48px; }
+.wrap { max-width: 1100px; margin: 0 auto; }
+header.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); margin-bottom: 20px; flex-wrap: wrap; }
+.logo { font-family: var(--font-display); font-size: 20px; color: var(--pink); text-decoration: none; }
+.logo span { color: var(--accent); }
+.logo small { font-family: var(--font-body); color: var(--muted); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-left: 8px; }
+h2 { font-family: var(--font-display); font-size: 20px; margin: 28px 0 10px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px; }
+.tile .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
+.tile .v { font-family: var(--font-display); font-size: 30px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .s { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; }
+tbody tr.click { cursor: pointer; }
+tbody tr.click:hover, tbody tr.click:focus-visible { background: var(--panel-2); outline: none; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.good { color: var(--good); border-color: var(--good); }
+.pill.warn { color: var(--warn); border-color: var(--warn); }
+.pill.bad { color: var(--bad); border-color: var(--bad); }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+input[type=search] { flex: 1; min-width: 200px; background: var(--panel); border: 1px solid var(--line); color: var(--ink); padding: 9px 12px; border-radius: 2px; font: inherit; }
+button, .btn { font: inherit; cursor: pointer; background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 7px 12px; border-radius: 2px; text-decoration: none; display: inline-block; }
+button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
+button.primary { background: var(--accent); color: #002222; border-color: var(--accent); font-weight: 700; }
+button.danger:hover { border-color: var(--bad); color: var(--bad); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.detail { position: fixed; inset: 0 0 0 auto; width: min(520px, 100%); background: var(--panel); border-left: 2px solid var(--accent); padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 24px; overflow-y: auto; z-index: 20; display: flex; flex-direction: column; gap: 16px; }
+.veil { position: fixed; inset: 0; background: rgba(5,3,15,.6); z-index: 19; }
+.detail h3 { font-family: var(--font-display); font-size: 22px; margin: 0; overflow-wrap: anywhere; }
+.detail .meta { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.detail h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.box { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: var(--panel-2); }
+.box table td, .box table th { padding: 6px 8px; white-space: normal; }
+.msg { min-height: 1.2em; font-size: 14px; color: var(--good); }
+.msg.err { color: var(--bad); }
+.gate { max-width: 420px; margin: 12vh auto; text-align: center; display: flex; flex-direction: column; gap: 12px; }
+.gate h1 { font-family: var(--font-display); color: var(--pink); margin: 0; }
+.empty { color: var(--muted); padding: 16px; }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="logo" href="/">RETRO<span>QUEST</span><small>Admin</small></a>
+    <div class="row"><span id="who" class="meta"></span><a class="btn" href="/">Back to the arcade</a></div>
+  </header>
+
+  <section id="gate" class="gate" hidden>
+    <h1>Admins only</h1>
+    <p id="gateMsg">Sign in on the arcade with an admin email address, then come back here.</p>
+    <a class="btn" href="/">Go to the arcade</a>
+  </section>
+
+  <main id="main" hidden>
+    <div class="tiles">
+      <div class="tile"><div class="k">Players</div><div class="v" id="tUsers">0</div><div class="s" id="tUsers30">0 joined in 30 days</div></div>
+      <div class="tile"><div class="k">Paying players</div><div class="v" id="tBuyers">0</div><div class="s" id="tConv">0% of players</div></div>
+      <div class="tile"><div class="k">Revenue, all time</div><div class="v" id="tRev">$0</div><div class="s" id="tSales">0 sales</div></div>
+      <div class="tile"><div class="k">Revenue, 30 days</div><div class="v" id="tRev30">$0</div><div class="s" id="tSales30">0 sales</div></div>
+    </div>
+
+    <h2>Recent sales</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>When</th><th>Player</th><th>Product</th><th class="num">Amount</th><th>Status</th></tr></thead>
+      <tbody id="sales"></tbody>
+    </table></div>
+
+    <h2>Players</h2>
+    <div class="toolbar">
+      <label for="q" class="meta" hidden>Search players</label>
+      <input type="search" id="q" placeholder="Search by name or email">
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th>Last seen</th><th>Owns</th><th class="num">Spent</th></tr></thead>
+      <tbody id="users"></tbody>
+    </table></div>
+  </main>
+</div>
+
+<div class="veil" id="veil" hidden></div>
+<aside class="detail" id="detail" hidden aria-label="Player details"></aside>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+let catalog = {};
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = (c, cur = 'usd') => new Intl.NumberFormat('en-US', { style: 'currency', currency: String(cur).toUpperCase() }).format((c || 0) / 100);
+const when = t => t ? new Date(t * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+const day = t => t ? new Date(t * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const skuName = s => (catalog[s] && catalog[s].name) || s;
+const shortSku = s => s === 'port-lucky' ? 'Game' : s === 'port-lucky-walkthrough' ? 'Walkthrough' : s;
+async function api(method, path, data) {
+  const res = await fetch(path, { method, credentials: 'same-origin', headers: data ? { 'content-type': 'application/json' } : {}, body: data ? JSON.stringify(data) : undefined });
+  let out = {}; try { out = await res.json(); } catch (e) {}
+  if (!res.ok) { const e = new Error(out.error || 'Request failed'); e.status = res.status; throw e; }
+  return out;
+}
+
+async function loadStats() {
+  const s = await api('GET', '/api/admin/stats');
+  catalog = s.catalog || {};
+  $('tUsers').textContent = s.users; $('tUsers30').textContent = `${s.users30} joined in 30 days`;
+  $('tBuyers').textContent = s.buyers; $('tConv').textContent = `${s.users ? Math.round(s.buyers / s.users * 100) : 0}% of players`;
+  $('tRev').textContent = money(s.revenue_cents); $('tSales').textContent = `${s.sales} sales`;
+  $('tRev30').textContent = money(s.revenue30_cents); $('tSales30').textContent = `${s.sales30} sales`;
+  $('sales').innerHTML = s.recent.length ? s.recent.map(r => `<tr><td>${when(r.paid_at || r.created_at)}</td><td>${esc(r.email || 'deleted account')}</td><td>${esc(skuName(r.sku))}</td><td class="num">${money(r.amount_cents, r.currency)}</td><td><span class="pill ${r.status === 'paid' ? 'good' : r.status === 'refunded' ? 'bad' : 'warn'}">${esc(r.status)}</span></td></tr>`).join('')
+    : `<tr><td colspan="5" class="empty">No sales yet. They appear here as soon as Stripe confirms a payment.</td></tr>`;
+}
+let qTimer = null;
+async function loadUsers() {
+  const q = $('q').value.trim();
+  const { users } = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
+  $('users').innerHTML = users.length ? users.map(u => `<tr class="click" tabindex="0" data-id="${u.id}"><td>${esc(u.name)}</td><td>${esc(u.email)} ${u.verified_at ? '' : '<span class="pill warn">unconfirmed</span>'}</td><td>${day(u.created_at)}</td><td>${day(u.last_seen_at)}</td><td>${u.skus ? u.skus.split(',').map(s => `<span class="pill good">${esc(shortSku(s))}</span>`).join(' ') : '<span class="pill">Free</span>'}</td><td class="num">${money(u.spent_cents)}</td></tr>`).join('')
+    : `<tr><td colspan="6" class="empty">${q ? 'No players match that search.' : 'No players yet.'}</td></tr>`;
+  $('users').querySelectorAll('tr.click').forEach(tr => { tr.onclick = () => openUser(tr.dataset.id); tr.onkeydown = e => { if (e.key === 'Enter') openUser(tr.dataset.id); }; });
+}
+$('q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(loadUsers, 250); });
+
+async function openUser(id) {
+  const d = await api('GET', `/api/admin/users/${id}`);
+  const u = d.user, owned = new Set(d.entitlements.map(e => e.sku));
+  const el = $('detail');
+  el.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(u.name)}</h3><div class="meta">${esc(u.email)}</div></div><button id="dClose">Close</button></div>
+    <div class="meta">Joined ${when(u.created_at)} · Last seen ${when(u.last_seen_at)} · Email ${u.verified_at ? 'confirmed' : 'not confirmed'} · Hints revealed: ${d.hints}</div>
+    <div class="box"><h4>Products</h4>
+      <table><tbody>${Object.keys(catalog).map(sku => { const e = d.entitlements.find(x => x.sku === sku); return `<tr><td>${esc(catalog[sku].name)}</td><td>${e ? `<span class="pill good">owned</span> <span class="meta">${e.source === 'admin' ? 'granted by admin' : 'paid'}</span>` : '<span class="pill">not owned</span>'}</td><td class="num">${e ? `<button class="danger" data-revoke="${sku}">Remove</button>` : `<button data-grant="${sku}">Give free</button>`}</td></tr>`; }).join('')}</tbody></table>
+    </div>
+    <div class="box"><h4>Account actions</h4>
+      <div class="row"><button id="aLink">Email a sign-in link</button><button id="aSignout">Sign out everywhere</button><button class="danger" id="aReset">Reset saved game</button></div>
+      <div class="msg" id="dMsg" role="status"></div>
+    </div>
+    <div class="box"><h4>Saved game</h4>${d.saves.length ? d.saves.map(s => `<div class="meta">${esc(s.game_id)} · ${esc(s.room || '?')} · score ${esc(s.score ?? 0)} · saved ${when(s.updated_at)}</div>`).join('') : '<div class="meta">No saved game yet.</div>'}</div>
+    <div class="box"><h4>Purchases</h4>${d.purchases.length ? `<table><thead><tr><th>Date</th><th>Product</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>${d.purchases.map(p => `<tr><td>${day(p.paid_at || p.created_at)}</td><td>${esc(shortSku(p.sku))}</td><td class="num">${money(p.amount_cents, p.currency)}</td><td><span class="pill ${p.status === 'paid' ? 'good' : p.status === 'refunded' ? 'bad' : 'warn'}">${esc(p.status === 'pending' ? 'checkout not finished' : p.status)}</span></td></tr>`).join('')}</tbody></table>` : '<div class="meta">No purchases.</div>'}</div>
+    <div class="box"><h4>Emails sent</h4>${d.emails.length ? `<table><tbody>${d.emails.map(m => `<tr><td>${when(m.created_at)}</td><td>${esc(m.kind)}</td><td><span class="pill ${m.status === 'sent' ? 'good' : 'bad'}">${esc(m.status)}</span>${m.error ? `<div class="meta">${esc(m.error)}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No emails yet.</div>'}</div>`;
+  el.hidden = false; $('veil').hidden = false;
+  const msg = (t, bad) => { const m = $('dMsg'); m.textContent = t; m.className = 'msg' + (bad ? ' err' : ''); };
+  const act = async (fn, okText, reopen = true) => { try { const r = await fn(); msg(okText + (r && r.dev_link ? ` Test link: ${r.dev_link}` : '')); if (reopen) { await openUser(id); msg(okText); } loadUsers(); loadStats(); } catch (e) { msg(e.message, true); } };
+  $('dClose').onclick = closeUser; $('dClose').focus();
+  el.querySelectorAll('[data-grant]').forEach(b => b.onclick = () => act(() => api('POST', `/api/admin/users/${id}/grant`, { sku: b.dataset.grant }), 'Product given.'));
+  el.querySelectorAll('[data-revoke]').forEach(b => b.onclick = () => { if (b.dataset.armed) return act(() => api('POST', `/api/admin/users/${id}/revoke`, { sku: b.dataset.revoke }), 'Product removed.'); b.dataset.armed = '1'; b.textContent = 'Click again to remove'; });
+  $('aLink').onclick = () => act(() => api('POST', `/api/admin/users/${id}/send-link`), 'Sign-in link sent.', false);
+  $('aSignout').onclick = () => act(() => api('POST', `/api/admin/users/${id}/signout`), 'Signed out on all devices.', false);
+  $('aReset').onclick = function () { if (this.dataset.armed) return act(() => api('POST', `/api/admin/users/${id}/reset-save`), 'Saved game reset.'); this.dataset.armed = '1'; this.textContent = 'Click again to reset'; };
+}
+function closeUser() { $('detail').hidden = true; $('veil').hidden = true; }
+$('veil').onclick = closeUser;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUser(); });
+
+(async () => {
+  try {
+    const me = await api('GET', '/api/me');
+    if (!me.user) { $('gate').hidden = false; return; }
+    if (!me.user.isAdmin) { $('gateMsg').textContent = `${me.user.email} isn't an admin account.`; $('gate').hidden = false; return; }
+    $('who').textContent = me.user.email;
+    $('main').hidden = false;
+    await loadStats(); await loadUsers();
+  } catch (e) { $('gateMsg').textContent = e.message; $('gate').hidden = false; }
+})();
+})();
+</script>
+</body>
+</html>

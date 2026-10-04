@@ -1,0 +1,17 @@
+{
+  "name": "retroquests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Retro Quest Arcade: original Sierra-style adventure games, accounts, Stripe payments and paid walkthroughs on Cloudflare Workers + D1.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "logs": "wrangler tail",
+    "db:migrate": "wrangler d1 migrations apply retro-quest-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply retro-quest-db --local"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

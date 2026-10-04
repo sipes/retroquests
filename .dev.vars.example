@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local testing with `npm run dev`.
+# DEV_MODE=1 fakes payments (no Stripe) and prints emails to the log (no Mailtrap).
+DEV_MODE=1
+# Optional: uncomment to test real email/payments locally
+# MAILTRAP_TOKEN=
+# MAILTRAP_INBOX_ID=
+# STRIPE_SECRET_KEY=
+# STRIPE_WEBHOOK_SECRET=
