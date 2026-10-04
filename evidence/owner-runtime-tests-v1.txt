@@ -1,0 +1,45 @@
+PASS actual Worker headers + catalog disable sale + fixture paths not shipped
+PASS actual D1 unverified seeded admin denied
+PASS actual D1 simultaneous controlled mailbox proof consumes once
+PASS actual runtime missing auth/mail configuration honest 503, no public hook
+PASS actual D1 concurrent CAS and stale revisions; server acknowledgement
+PASS actual D1 hint authorization and admin dependency/audit
+PASS actual D1 signed simultaneous duplicates and refund ordering/provenance
+PASS actual D1 deletion retains detached financial record
+{
+  "runtime": "Wrangler/workerd + local D1 (not live providers)",
+  "results": [
+    {
+      "name": "actual Worker headers + catalog disable sale + fixture paths not shipped",
+      "status": "PASS"
+    },
+    {
+      "name": "actual D1 unverified seeded admin denied",
+      "status": "PASS"
+    },
+    {
+      "name": "actual D1 simultaneous controlled mailbox proof consumes once",
+      "status": "PASS"
+    },
+    {
+      "name": "actual runtime missing auth/mail configuration honest 503, no public hook",
+      "status": "PASS"
+    },
+    {
+      "name": "actual D1 concurrent CAS and stale revisions; server acknowledgement",
+      "status": "PASS"
+    },
+    {
+      "name": "actual D1 hint authorization and admin dependency/audit",
+      "status": "PASS"
+    },
+    {
+      "name": "actual D1 signed simultaneous duplicates and refund ordering/provenance",
+      "status": "PASS"
+    },
+    {
+      "name": "actual D1 deletion retains detached financial record",
+      "status": "PASS"
+    }
+  ]
+}

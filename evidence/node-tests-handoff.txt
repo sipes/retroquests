@@ -1,0 +1,37 @@
+✔ exact seven methods and response shapes; failure/conflict rejects (32.71475ms)
+✔ identity or access change invalidates in-flight hint/save response (1.09343ms)
+✔ host destroys before remount; teardown interval and instance (0.665233ms)
+✔ explicit suite/garage compatibility does not rewrite game mechanics (0.474279ms)
+✔ out-of-order /me cannot restore stale player or paid access (29.812865ms)
+✔ different simultaneous completion events claim a single receipt; provider failure visible for reconciliation (45.304444ms)
+✔ controlled mocked mailbox proof precedes admin and concurrent token consumes once (69.608687ms)
+Unhandled platform error
+✔ login transaction failure rolls back token, identity and session (5.259858ms)
+✔ email missing config no logs/tokens; provider failure honest and redacted (7.368127ms)
+✔ durable auth limits and anti-enumeration; protection fails closed (9.254223ms)
+✔ baseline populated migration preserves financial rows, legacy saves and grants (4.187008ms)
+Unhandled platform error
+✔ deletion rollback preserves all personal and financial records (4.313441ms)
+✔ signed duplicate completion effects atomically once; invalid signatures/amounts rejected (12.733367ms)
+✔ refund before completion creates terminal tombstone; no late revival (5.91929ms)
+✔ full refund removes only purchase contribution; admin and other purchase survive (9.737391ms)
+✔ admin revocation survives late completion and walkthrough dependency enforced (13.488661ms)
+✔ partial refund/dispute visibly reconcile without invented automatic policy (5.684166ms)
+Unhandled platform error
+✔ event effect failure rolls claim back for retry (4.672278ms)
+✔ CAS simultaneous devices one winner, stale rejected, accounts isolated, reset avoids ABA (6.760056ms)
+✔ save JSON version, malformed and UTF-8 bounds; header and disabled sales (5.468351ms)
+✔ admin audit minimal identifiers, reset and signout are effective (6.48838ms)
+✔ checkout provider request pins USD base amount without promotions or automatic tax (0.767654ms)
+✔ unverified admin is not privileged (37.217633ms)
+✔ signup requires mailbox proof; no cookie or token hook (7.414958ms)
+✔ purchaser deletion retains detached accounting with FK on (4.79053ms)
+✔ save write requires a version and CAS revision (4.241379ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 266.276563

@@ -1,0 +1,39 @@
+✔ exact seven methods and response shapes; failure/conflict rejects (34.554862ms)
+✔ identity or access change invalidates in-flight hint/save response (1.120271ms)
+✔ host destroys before remount; teardown interval and instance (0.717133ms)
+✔ explicit suite/garage compatibility does not rewrite game mechanics (0.52334ms)
+✔ out-of-order /me cannot restore stale player or paid access (30.958145ms)
+✔ different simultaneous completion events claim a single receipt; provider failure visible for reconciliation (46.174787ms)
+✔ controlled mocked mailbox proof precedes admin and concurrent token consumes once (71.407925ms)
+Unhandled platform error
+✔ login transaction failure rolls back token, identity and session (5.161525ms)
+✔ email missing config no logs/tokens; provider failure honest and redacted (6.962058ms)
+✔ durable auth limits and anti-enumeration; protection fails closed (8.478166ms)
+✔ baseline populated migration preserves financial rows, legacy saves and grants (3.994264ms)
+Unhandled platform error
+✔ deletion rollback preserves all personal and financial records (4.030734ms)
+✔ signed duplicate completion effects atomically once; invalid signatures/amounts rejected (12.672664ms)
+✔ refund before completion creates terminal tombstone; no late revival (5.40053ms)
+✔ full refund removes only purchase contribution; admin and other purchase survive (9.074758ms)
+✔ admin revocation survives late completion and walkthrough dependency enforced (12.521992ms)
+✔ partial refund/dispute visibly reconcile without invented automatic policy (5.571005ms)
+Unhandled platform error
+✔ event effect failure rolls claim back for retry (4.498253ms)
+✔ CAS simultaneous devices one winner, stale rejected, accounts isolated, reset avoids ABA (6.722895ms)
+✔ save JSON version, malformed and UTF-8 bounds; header and disabled sales (5.396771ms)
+✔ admin audit minimal identifiers, reset and signout are effective (6.376139ms)
+✔ checkout provider request pins USD base amount without promotions or automatic tax (0.788384ms)
+✔ signed completions validate currency user SKU purchase; delayed payment grants only after paid (69.893717ms)
+✔ admin target detail never labels unverified allowlisted identity privileged (41.699313ms)
+✔ unverified admin is not privileged (44.967894ms)
+✔ signup requires mailbox proof; no cookie or token hook (8.312535ms)
+✔ purchaser deletion retains detached accounting with FK on (5.385449ms)
+✔ save write requires a version and CAS revision (4.577306ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 263.987427

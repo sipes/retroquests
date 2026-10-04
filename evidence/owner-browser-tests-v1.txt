@@ -1,0 +1,61 @@
+PASS real browser catalog + disabled sale/notification + actual static headers
+PASS real browser signup/signin failclosed UI without private credentials
+PASS real browser denied admin then controlled mailbox proof enables admin
+PASS real browser original suite mechanics + acknowledged CAS saves + paywall
+PASS real browser admin grant + original garage continuation and puzzles
+PASS real browser multi-device conflict retains pending; explicit reload; transport failure visible
+PASS real browser failed in-flight save retains newer pending gameplay snapshot
+PASS real browser entitlement loss tears down root and clears paid play
+PASS service worker cache only controlled public icon/manifest allowlist
+PASS real browser stale player refresh cannot undo local signout; drawer/menu teardown
+PASS real browser inert seven-method adapter stub conflict + destroy/remount
+{
+  "browser": "Actual local Chromium with Wrangler/local D1; external requests blocked. Stub and aborted-save cases labelled synthetic.",
+  "checks": [
+    {
+      "name": "real browser catalog + disabled sale/notification + actual static headers",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser signup/signin failclosed UI without private credentials",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser denied admin then controlled mailbox proof enables admin",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser original suite mechanics + acknowledged CAS saves + paywall",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser admin grant + original garage continuation and puzzles",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser multi-device conflict retains pending; explicit reload; transport failure visible",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser failed in-flight save retains newer pending gameplay snapshot",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser entitlement loss tears down root and clears paid play",
+      "status": "PASS"
+    },
+    {
+      "name": "service worker cache only controlled public icon/manifest allowlist",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser stale player refresh cannot undo local signout; drawer/menu teardown",
+      "status": "PASS"
+    },
+    {
+      "name": "real browser inert seven-method adapter stub conflict + destroy/remount",
+      "status": "PASS"
+    }
+  ],
+  "pageErrors": []
+}

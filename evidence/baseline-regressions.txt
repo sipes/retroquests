@@ -1,0 +1,92 @@
+✖ unverified admin is not privileged (32.660094ms)
+✖ signup requires mailbox proof; no cookie or token hook (6.373518ms)
+Unhandled error Error: FOREIGN KEY constraint failed
+    at Object.run (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/helpers.js:9:262)
+    at Object.batch (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/helpers.js:10:118)
+    at async deleteAccount (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/src/index.js:227:3)
+    at async Object.fetch (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/src/index.js:19:19)
+    at async TestContext.<anonymous> (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/regressions.test.js:6:289)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+✖ purchaser deletion retains detached accounting with FK on (3.77659ms)
+✖ save write requires a version and CAS revision (2.928214ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 124.557625
+
+✖ failing tests:
+
+test at tests/platform/regressions.test.js:4:1
+✖ unverified admin is not privileged (32.660094ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  200 !== 403
+  
+      at TestContext.<anonymous> (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/regressions.test.js:4:195)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 403,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/platform/regressions.test.js:5:1
+✖ signup requires mailbox proof; no cookie or token hook (6.373518ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rq_session=[REDACTED_SYNTHETIC_SESSION]; Path=/; HttpOnly; SameSite=Lax; Max-Age=15552000'
+  - null
+  
+      at TestContext.<anonymous> (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/regressions.test.js:5:282)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rq_session=[REDACTED_SYNTHETIC_SESSION]; Path=/; HttpOnly; SameSite=Lax; Max-Age=15552000',
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/platform/regressions.test.js:6:1
+✖ purchaser deletion retains detached accounting with FK on (3.77659ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  500 !== 200
+  
+      at TestContext.<anonymous> (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/regressions.test.js:6:380)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 500,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/platform/regressions.test.js:7:1
+✖ save write requires a version and CAS revision (2.928214ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  200 !== 400
+  
+      at TestContext.<anonymous> (file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests/tests/platform/regressions.test.js:7:212)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 200,
+    expected: 400,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
