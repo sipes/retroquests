@@ -1,0 +1,44 @@
+✔ exact seven methods and response shapes; failure/conflict rejects (44.042578ms)
+✔ identity or access change invalidates in-flight hint/save response (1.299453ms)
+✔ host destroys before remount; teardown interval and instance (0.664653ms)
+✔ explicit suite/garage compatibility does not rewrite game mechanics (0.551589ms)
+✔ out-of-order /me cannot restore stale player or paid access (34.757595ms)
+✔ different simultaneous completion events claim a single receipt; provider failure visible for reconciliation (47.189096ms)
+✔ controlled mocked mailbox proof precedes admin and concurrent token consumes once (74.219929ms)
+Unhandled platform error
+✔ login transaction failure rolls back token, identity and session (4.879291ms)
+✔ email missing config no logs/tokens; provider failure honest and redacted (6.903038ms)
+✔ durable auth limits and anti-enumeration; protection fails closed (8.930186ms)
+✔ baseline populated migration preserves financial rows, legacy saves and grants (4.032744ms)
+Unhandled platform error
+✔ deletion rollback preserves all personal and financial records (4.120867ms)
+✔ signed duplicate completion effects atomically once; invalid signatures/amounts rejected (12.597685ms)
+✔ refund before completion creates terminal tombstone; no late revival (5.540874ms)
+✔ full refund removes only purchase contribution; admin and other purchase survive (9.327602ms)
+✔ admin revocation survives late completion and walkthrough dependency enforced (12.481882ms)
+✔ partial refund/dispute visibly reconcile without invented automatic policy (5.666094ms)
+Unhandled platform error
+✔ event effect failure rolls claim back for retry (4.552805ms)
+✔ CAS simultaneous devices one winner, stale rejected, accounts isolated, reset avoids ABA (6.433419ms)
+✔ save JSON version, malformed and UTF-8 bounds; header and disabled sales (5.526302ms)
+✔ admin audit minimal identifiers, reset and signout are effective (6.458239ms)
+✔ checkout provider request pins USD base amount without promotions or automatic tax (0.734854ms)
+✔ landing identifies the arcade before the original featured adventure (1.388295ms)
+✔ landing has honest demo, development and planned SKU-specific pricing (0.403517ms)
+✔ original landing handlers and hardened inline JS are byte-identical to approved base (0.846864ms)
+✔ actual worker config keeps full-game and optional-hint prices distinct and sales disabled (62.825767ms)
+✔ original licensed fonts are local and contain the five required faces (1.970477ms)
+✔ signed completions validate currency user SKU purchase; delayed payment grants only after paid (83.945188ms)
+✔ admin target detail never labels unverified allowlisted identity privileged (37.978117ms)
+✔ unverified admin is not privileged (49.834756ms)
+✔ signup requires mailbox proof; no cookie or token hook (7.456369ms)
+✔ purchaser deletion retains detached accounting with FK on (4.802949ms)
+✔ save write requires a version and CAS revision (4.576056ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 271.054044

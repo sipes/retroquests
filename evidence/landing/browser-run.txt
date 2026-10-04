@@ -1,0 +1,239 @@
+{
+  "scope": "Isolated static landing; config from actual worker using in-memory SQLite; identity/save API fixtures explicitly synthetic. No UAT DB or provider access.",
+  "results": [
+    {
+      "width": 320,
+      "status": "PASS",
+      "scrollWidth": 320,
+      "fonts": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "targets": [
+        {
+          "id": "logoBtn",
+          "height": 44
+        },
+        {
+          "id": "Sign in",
+          "height": 44
+        },
+        {
+          "id": "Sign up free",
+          "height": 44
+        },
+        {
+          "id": "playHero",
+          "height": 46
+        },
+        {
+          "id": "Browse the catalogue ↓",
+          "height": 46
+        },
+        {
+          "id": "playCard",
+          "height": 44
+        }
+      ],
+      "canvases": [
+        {
+          "id": "heroCanvas",
+          "painted": true
+        },
+        {
+          "id": "cover1",
+          "painted": true
+        },
+        {
+          "id": "cover2",
+          "painted": true
+        },
+        {
+          "id": "cover3",
+          "painted": true
+        }
+      ],
+      "transition": "0s"
+    },
+    {
+      "width": 390,
+      "status": "PASS",
+      "scrollWidth": 390,
+      "fonts": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "targets": [
+        {
+          "id": "logoBtn",
+          "height": 44
+        },
+        {
+          "id": "Sign in",
+          "height": 44
+        },
+        {
+          "id": "Sign up free",
+          "height": 44
+        },
+        {
+          "id": "playHero",
+          "height": 46
+        },
+        {
+          "id": "Browse the catalogue ↓",
+          "height": 46
+        },
+        {
+          "id": "playCard",
+          "height": 44
+        }
+      ],
+      "canvases": [
+        {
+          "id": "heroCanvas",
+          "painted": true
+        },
+        {
+          "id": "cover1",
+          "painted": true
+        },
+        {
+          "id": "cover2",
+          "painted": true
+        },
+        {
+          "id": "cover3",
+          "painted": true
+        }
+      ],
+      "transition": "0s"
+    },
+    {
+      "width": 768,
+      "status": "PASS",
+      "scrollWidth": 768,
+      "fonts": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "targets": [
+        {
+          "id": "logoBtn",
+          "height": 44
+        },
+        {
+          "id": "Sign in",
+          "height": 44
+        },
+        {
+          "id": "Sign up free",
+          "height": 44
+        },
+        {
+          "id": "playHero",
+          "height": 46
+        },
+        {
+          "id": "Browse the catalogue ↓",
+          "height": 46
+        },
+        {
+          "id": "playCard",
+          "height": 44
+        }
+      ],
+      "canvases": [
+        {
+          "id": "heroCanvas",
+          "painted": true
+        },
+        {
+          "id": "cover1",
+          "painted": true
+        },
+        {
+          "id": "cover2",
+          "painted": true
+        },
+        {
+          "id": "cover3",
+          "painted": true
+        }
+      ],
+      "transition": "0s"
+    },
+    {
+      "width": 1440,
+      "status": "PASS",
+      "scrollWidth": 1440,
+      "fonts": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "targets": [
+        {
+          "id": "logoBtn",
+          "height": 44
+        },
+        {
+          "id": "Sign in",
+          "height": 44
+        },
+        {
+          "id": "Sign up free",
+          "height": 44
+        },
+        {
+          "id": "playHero",
+          "height": 46
+        },
+        {
+          "id": "Browse the catalogue ↓",
+          "height": 46
+        },
+        {
+          "id": "playCard",
+          "height": 44
+        }
+      ],
+      "canvases": [
+        {
+          "id": "heroCanvas",
+          "painted": true
+        },
+        {
+          "id": "cover1",
+          "painted": true
+        },
+        {
+          "id": "cover2",
+          "painted": true
+        },
+        {
+          "id": "cover3",
+          "painted": true
+        }
+      ],
+      "transition": "0s"
+    },
+    {
+      "name": "Original Play handler enters suite and returns home (synthetic identity)",
+      "status": "PASS"
+    }
+  ],
+  "pageErrors": [],
+  "externalRequests": []
+}
