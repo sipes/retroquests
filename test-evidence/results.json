@@ -1,0 +1,83 @@
+[
+  {
+    "name": "full-run-dolphin",
+    "status": "pass",
+    "ms": 242540,
+    "notes": [
+      "score 250/250, hints 0, margin 296s, actions 100"
+    ],
+    "errors": []
+  },
+  {
+    "name": "full-run-cash-with-hints",
+    "status": "pass",
+    "ms": 243490,
+    "notes": [
+      "score 250/250 on the cash route, hints used 2, margin 296s"
+    ],
+    "errors": []
+  },
+  {
+    "name": "free-player-paywall-and-denied-hints",
+    "status": "pass",
+    "ms": 9975,
+    "notes": [
+      "paywall shown, checkout refused by fixture, entitlements unchanged, paywall persists on reload"
+    ],
+    "errors": []
+  },
+  {
+    "name": "deaths-retry-restart",
+    "status": "pass",
+    "ms": 341130,
+    "notes": [
+      "deaths verified: cocktail, karaoke-no-token, duane-trophy, alley-bottle, gulls, hammer-on-glass, call-mom, breakwater, diesel, dinghy-no-rope, winch, hip-flask, bridal-tent, clock"
+    ],
+    "errors": []
+  },
+  {
+    "name": "old-save-migration",
+    "status": "pass",
+    "ms": 9668,
+    "notes": [
+      "v1 saves (mid-demo and demo-complete) migrate to v2 and continue"
+    ],
+    "errors": []
+  },
+  {
+    "name": "save-failure-visible",
+    "status": "pass",
+    "ms": 2929,
+    "notes": [
+      "failed save shows \"Save failed\" + Retry; retry succeeds and persists"
+    ],
+    "errors": []
+  },
+  {
+    "name": "account-change",
+    "status": "pass",
+    "ms": 15152,
+    "notes": [
+      "signed-out state hands control back to host (onExit) or shows the gate: onExit"
+    ],
+    "errors": []
+  },
+  {
+    "name": "mobile-layouts",
+    "status": "pass",
+    "ms": 4480,
+    "notes": [
+      "portrait rotate prompt, landscape side actions, Type + Items sheets, tap-to-use on canvas"
+    ],
+    "errors": []
+  },
+  {
+    "name": "mount-unmount-and-clicks",
+    "status": "pass",
+    "ms": 4573,
+    "notes": [
+      "verb clicks, item-on-hotspot clicks, unmount/remount"
+    ],
+    "errors": []
+  }
+]
