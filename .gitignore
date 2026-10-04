@@ -3,3 +3,17 @@ node_modules/
 .dev.vars
 .DS_Store
 Thumbs.db
+evidence/*.txt
+!evidence/baseline-regressions.txt
+!evidence/owner-execution-brief-v1.txt
+!evidence/node-tests-handoff.txt
+!evidence/runtime-handoff-final.txt
+!evidence/browser-handoff-final.txt
+!evidence/migrations-handoff.txt
+!evidence/fk-handoff.txt
+!evidence/owner-node-tests-v1.txt
+!evidence/owner-runtime-tests-v1.txt
+!evidence/owner-browser-tests-v1.txt
+!evidence/owner-migrations-v1.txt
+!evidence/owner-fk-v1.txt
+evidence/*.sql

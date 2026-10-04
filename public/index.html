@@ -331,7 +331,7 @@ button, .verb, .item, canvas { touch-action: manipulation; }
         <button class="btn alt" id="buyHero">Full game · <span data-price="port-lucky">$7.99</span></button>
       </div>
       <div class="meta">
-        <span class="chip">Type or click</span><span class="chip">EGA, 16 colours</span><span class="chip">About 2–3 hours</span><span class="chip">Ages 16+</span>
+        <span class="chip">Type or click</span><span class="chip">EGA, 16 colours</span><span class="chip">Two-scene demo · full adventure in development</span><span class="chip">Ages 16+</span>
       </div>
     </div>
     <div class="crt"><canvas id="heroCanvas" width="320" height="180" aria-label="The Honeymoon Suite: a goat in a bow tie on a green sofa, a tuba on the carpet"></canvas></div>
@@ -362,11 +362,12 @@ button, .verb, .item, canvas { touch-action: manipulation; }
         <div class="row"><span class="chip">Coming 2027</span><button class="btn small ghost" data-wish="Crown of Thistlemere">Notify me</button></div></div>
     </article>
   </div>
-  <p class="foot">All games, characters and art are original. Payments are processed securely by Stripe.</p>
+  <p class="foot">Demo candidate. Sales and notifications are disabled pending approval. Terms, privacy, refund and support details are release gates; no live launch is claimed.</p>
 </main>
 
 <main class="wrap" id="gameView" hidden>
   <div class="game-top">
+    <div role="status" id="saveStatus">Not saved</div><button class="btn small ghost" id="retrySave">Retry pending save</button><button class="btn small ghost" id="reloadSave">Load server progress (discard pending)</button>
     <h2 id="sceneTitle">Last Night in Port Lucky</h2>
     <div class="cta-row">
       <button class="btn small ghost fs-btn" id="fsTopBtn" hidden>Full screen</button>
@@ -419,7 +420,9 @@ button, .verb, .item, canvas { touch-action: manipulation; }
 <div id="modalRoot"></div>
 <div class="toast" id="toast" hidden></div>
 
-<script>
+<script type="module">
+import { createPlatform } from './platform.js';
+import { readLegacyPortalSave } from './legacy-save.js';
 (() => {
 'use strict';
 /* ---------- Palette + pixel helpers ---------- */
@@ -435,34 +438,53 @@ const KEY = 'rq-arcade-demo-v1';
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
 const GAME_ID = 'port-lucky', SKU_GAME = 'port-lucky', SKU_WALK = 'port-lucky-walkthrough';
 let catalog = {}, devMode = false, saveTimer = null, saving = null;
+let saveRevision=0, stateEpoch=0, pendingSave=null, saveConflict=false, corruptSave=false;
+const escapeHtml = t => String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const platform = createPlatform({requestSignIn:async()=>{signIn();},requestPurchase:async sku=>{await checkout(sku===SKU_WALK?'walk':'game');}});
 function persist() {
   try { localStorage.setItem(KEY, JSON.stringify({ settings })); } catch (e) {}
   if (!account || !game) return;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 800);
+  pendingSave=structuredClone(game);
+  saveTimer = setTimeout(() => saveNow().catch(()=>{}), 800);
 }
-function saveNow() {
+async function saveNow() {
   clearTimeout(saveTimer);
-  if (!account || !game) return Promise.resolve();
-  saving = api('PUT', '/api/save', { game_id: GAME_ID, data: game }).catch(() => {});
-  return saving;
+  if (!account || !game) return;
+  if(saveConflict || corruptSave) throw new Error('Not saved: choose explicit recovery before writing.');
+  const beforeWait=stateEpoch;
+  if(saving) await saving;
+  if(beforeWait!==stateEpoch || !account || !game) return;
+  const epoch=stateEpoch, snapshot=structuredClone(pendingSave || game);
+  $('saveStatus').textContent='Saving…';
+  saving=platform.saveGame(GAME_ID,{version:1,revision:saveRevision,data:snapshot});
+  try {const r=await saving; if(epoch!==stateEpoch)return;
+    if(!r.acknowledged)throw new Error('Save not acknowledged'); saveRevision=r.revision;
+    if(JSON.stringify(pendingSave)===JSON.stringify(snapshot))pendingSave=null;
+    $('saveStatus').textContent='Saved · revision '+r.revision;
+  } catch(e) {if(epoch===stateEpoch){saveConflict=e.status===409;if(!pendingSave)pendingSave=snapshot;$('saveStatus').textContent=(saveConflict?'Conflict — not saved. Keep pending or load server progress.':'Not saved — '+e.message); } throw e;
+  } finally {if(epoch===stateEpoch)saving=null;}
 }
 async function api(method, path, data) {
+  const epoch=stateEpoch;
   const res = await fetch(path, { method, credentials: 'same-origin', headers: data ? { 'content-type': 'application/json' } : {}, body: data ? JSON.stringify(data) : undefined });
   let out = {}; try { out = await res.json(); } catch (e) {}
+  if(epoch!==stateEpoch && /^\/api\/(save|hint)/.test(path)) throw new Error('Player changed; result discarded.');
   if (!res.ok) { const err = new Error(out.error || 'Something went wrong. Please try again.'); err.status = res.status; throw err; }
   return out;
 }
-function applyMe(me) {
+function applyMe(me, forceReset=false) {
+  const changed=forceReset || account?.id !== me.user?.id || JSON.stringify(ent)!==JSON.stringify({game:(me.entitlements||[]).includes(SKU_GAME),walk:(me.entitlements||[]).includes(SKU_WALK)});
+  if(changed) {stateEpoch++;clearTimeout(saveTimer);saving=null;pendingSave=null;saveConflict=false;corruptSave=false;hintTexts={};shown={};closeDrawer(true);$('acctMenu').hidden=true;$('acctMenu').replaceChildren();$('saveStatus').textContent='Not saved';walkTarget=null;walkThen=null;msgQueue=[];msgOpen=false;blocking=false;selItem=null;game=null;bgKey='';document.querySelectorAll('#view .sierra, #view .overlay-card, #view .using').forEach(n=>n.remove());$('modalRoot').replaceChildren();showView('home');}
   account = me.user || null;
   const owned = me.entitlements || [];
   ent = { game: owned.includes(SKU_GAME), walk: owned.includes(SKU_WALK) };
-  if (account) { const sv = me.saves && me.saves[GAME_ID]; if (sv && typeof sv === 'object' && sv.flags) game = sv; }
-  else game = null;
+  if (account && (changed || !game)) { const sv=me.save_envelopes?.[GAME_ID]; saveRevision=sv?.revision || 0; try {game=readLegacyPortalSave(sv);} catch(e){corruptSave=true;toast(e.message);$('saveStatus').textContent=e.message;} }
+  else if(!account) game = null;
   renderNav();
 }
-async function refreshMe() { try { applyMe(await api('GET', '/api/me')); } catch (e) {} }
-const price = sku => catalog[sku] ? '$' + (catalog[sku].price_cents / 100).toFixed(2) : '';
+async function refreshMe() { const epoch=stateEpoch; try { const state=await platform.getPlayerState(GAME_ID); if(epoch!==stateEpoch)return; applyMe({user:state.user,entitlements:state.entitlements,save_envelopes:{[GAME_ID]:state.save}}); } catch (e) {} }
+const price = sku => catalog[sku]?.display_price || 'Unavailable';
 
 /* ---------- State ---------- */
 let account = null;                       // {name, email}
@@ -1122,7 +1144,9 @@ function showView(v) {
 }
 function startGame() {
   if (!account) return signUp(startGame);
+  if(corruptSave) return toast('Unsupported save retained. Contact support after release approval; no automatic reset.');
   if (!game) game = newGame();
+  if(game.room==='garage' && !ent.game) return toast('Paid-scene access unavailable. Server progress is retained; no automatic reset.');
   if (coarse() && canFs) enterImmersive();
   showView('game');
   bgKey = ''; selItem = null; verb = 'walk';
@@ -1182,11 +1206,13 @@ function modal(html, onClose) {
   const close = () => { v.remove(); document.removeEventListener('keydown', esc); if (onClose) onClose(); };
   const esc = e => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', esc);
+  const observer = new MutationObserver(() => { if (!v.isConnected) { document.removeEventListener('keydown', esc); observer.disconnect(); } });
+  observer.observe($('modalRoot'), { childList: true });
   v.addEventListener('click', e => { if (e.target === v) close(); });
   $('modalRoot').appendChild(v);
   return { el: v, close };
 }
-function devLinkHtml(r) { return r && r.dev_link ? `<p class="note">Test mode: <a href="${r.dev_link}" style="color:var(--accent-2)">open the sign-in link</a></p>` : ''; }
+
 function signUp(then) {
   const m = modal(`<form class="modal" id="suForm" novalidate role="dialog" aria-labelledby="suT"><h3 id="suT">Create your free account</h3>
     <p>Free accounts play scene 1 of every game, and your saves follow you to any device.</p>
@@ -1206,13 +1232,8 @@ function signUp(then) {
     const go = m.el.querySelector('#suGo'); go.disabled = true; go.textContent = 'Creating…';
     try {
       const r = await api('POST', '/api/signup', { name, email });
-      if (r.status === 'created') {
-        applyMe(r); if (!game) game = null;
-        m.close(); toast(`Welcome, ${r.user.name}. Scene 1 is unlocked.`);
-        if (r.dev_link) console.log('Test sign-in link:', r.dev_link);
-        if (then) then();
-      } else {
-        m.el.querySelector('form, .modal').innerHTML = `<h3>Check your email</h3><p>${email} already has an account. We've sent a sign-in link to it.</p>${devLinkHtml(r)}<div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
+      {
+        m.el.querySelector('form, .modal').innerHTML = `<h3>Check your email</h3><p>If your request was eligible, an email was accepted for ${escapeHtml(email)}. Open the single-use link to verify and sign in. Provider acceptance is not a guarantee of inbox delivery.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
         m.el.querySelector('#okBtn').onclick = () => m.close();
       }
     } catch (x) { err.textContent = x.message; go.disabled = false; go.textContent = 'Sign up free'; }
@@ -1233,12 +1254,14 @@ function signIn() {
     const go = m.el.querySelector('#siGo'); go.disabled = true; go.textContent = 'Sending…';
     try {
       const r = await api('POST', '/api/login', { email });
-      m.el.querySelector('.modal').innerHTML = `<h3>Check your email</h3><p>If ${email} has an account, a sign-in link is on its way. It works once, for 30 minutes.</p>${devLinkHtml(r)}<div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
+      m.el.querySelector('.modal').innerHTML = `<h3>Check your email</h3><p>If ${escapeHtml(email)} has an account and is eligible, a sign-in email was accepted. Delivery is not guaranteed. It works once, for 30 minutes.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
       m.el.querySelector('#okBtn').onclick = () => m.close();
     } catch (x) { err.textContent = x.message; go.disabled = false; go.textContent = 'Email me a link'; }
   });
 }
 async function checkout(key) {
+  const requested=key==='walk'?SKU_WALK:SKU_GAME;
+  if(!catalog[requested]?.sale_enabled) return toast('Sales disabled: full content, provider and release approval are pending.');
   if (!account) return signUp(() => checkout(key));
   if (key === 'walk' && !ent.game) key = 'game';
   const sku = key === 'game' ? SKU_GAME : SKU_WALK;
@@ -1304,7 +1327,8 @@ let shown = {}; // what is visible this time the drawer is open
 let hintTexts = {}; // fetched from the server, only for walkthrough owners
 async function loadHints() {
   if (!account || !ent.walk) return;
-  try { const r = await api('GET', `/api/hints?game=${GAME_ID}`); const rev = {}; r.revealed.forEach(h => { if (h.text) hintTexts[h.puzzle_id + h.level] = h.text; rev[h.puzzle_id] = Math.max(rev[h.puzzle_id] ?? -1, h.level); }); if (game) { game.revealed = rev; game.hintsUsed = r.count; updateHud(); } } catch (e) {}
+  const epoch=stateEpoch;
+  try { const revealed = await platform.getRevealedHints(GAME_ID); if(epoch!==stateEpoch || !game)return; const rev = {}; revealed.forEach(h => { if (h.text) hintTexts[h.puzzle_id + h.level] = h.text; rev[h.puzzle_id] = Math.max(rev[h.puzzle_id] ?? -1, h.level); }); if (game) { game.revealed = rev; game.hintsUsed = revealed.length; updateHud(); } } catch (e) {}
 }
 function openDrawer() { shown = {}; renderDrawer(); loadHints().then(() => { if (!$('drawer').hidden) renderDrawer(); }); $('drawer').hidden = false; $('drawerVeil').hidden = false; const f = $('drawer').querySelector('button'); if (f) f.focus(); }
 function closeDrawer(silent) { $('drawer').hidden = true; $('drawerVeil').hidden = true; shown = {}; if (!silent && view === 'game' && !coarse()) $('cmd').focus({ preventScroll: true }); }
@@ -1340,9 +1364,12 @@ function renderDrawer() {
       if (i > got + 1) b.title = `Reveal the ${LEVEL_NAMES[i - 1].toLowerCase()} first`;
       b.onclick = () => {
         if (i <= got) { shown[p.id + i] = !shown[p.id + i]; return renderDrawer(); }
+        const epoch=stateEpoch;
         confirmReveal(p, i, async () => {
+          if(epoch!==stateEpoch || !game)return;
           try {
-            const r = await api('POST', '/api/hint', { game_id: GAME_ID, puzzle_id: p.id, level: i });
+            const r = await platform.revealHint(GAME_ID,p.id,i);
+            if(epoch!==stateEpoch || !game)return;
             hintTexts[p.id + i] = r.text; game.revealed[p.id] = i; game.hintsUsed++; shown[p.id + i] = true; persist(); updateHud(); renderDrawer();
           } catch (x) { toast(x.message); if (x.status === 402) { await refreshMe(); renderDrawer(); } }
         });
@@ -1383,14 +1410,14 @@ function renderMenu() {
     <div class="owned">Walkthrough: <b>${ent.walk ? 'owned' : 'not owned'}</b></div>`;
   if (account.isAdmin) { const a = document.createElement('a'); a.className = 'btn small alt'; a.href = '/admin.html'; a.textContent = 'Admin'; a.style.textDecoration = 'none'; m.appendChild(a); }
   const out = document.createElement('button'); out.className = 'btn small ghost'; out.textContent = 'Sign out';
-  out.onclick = async () => { await saveNow(); try { await api('POST', '/api/logout'); } catch (e) {} account = null; game = null; ent = { game: false, walk: false }; hintTexts = {}; m.hidden = true; renderNav(); showView('home'); toast('Signed out.'); };
+  out.onclick = async () => {try {await api('POST','/api/logout');applyMe({user:null});m.hidden=true;toast('Signed out. Unsaved in-memory progress cleared.');} catch(e){toast(e.message);} };
   const del = document.createElement('button'); del.className = 'btn small ghost'; del.textContent = 'Delete my account';
   del.onclick = () => { m.hidden = true; deleteAccount(); };
   m.append(out, del);
 }
 function deleteAccount() {
   const md = modal(`<form class="modal" id="delForm" role="alertdialog" aria-labelledby="delT"><h3 id="delT">Delete your account?</h3>
-    <p>This removes your account, saves and purchases from your profile for good. Games you bought can't be restored.</p>
+    <p>This deletes personal account, save, session and hint records. Minimal detached financial records remain for accounting. Stripe retention is separate and is not deleted by this action. Purchased access cannot be restored.</p>
     <div class="field"><label for="delEmail">Type your email to confirm</label><input id="delEmail" type="email" autocomplete="off"></div>
     <div class="err" id="delErr" role="alert"></div>
     <div class="row"><button type="button" class="btn alt" id="delNo">Keep my account</button><button class="btn ghost" type="submit">Delete account</button></div></form>`);
@@ -1398,7 +1425,7 @@ function deleteAccount() {
   md.el.querySelector('#delNo').focus();
   md.el.querySelector('#delForm').addEventListener('submit', async e => {
     e.preventDefault();
-    try { await api('DELETE', '/api/account', { confirm: md.el.querySelector('#delEmail').value }); md.close(); account = null; game = null; ent = { game: false, walk: false }; renderNav(); showView('home'); toast('Your account has been deleted.'); }
+    try { await api('DELETE', '/api/account', { confirm: md.el.querySelector('#delEmail').value }); md.close(); applyMe({user:null}); toast('Your account has been deleted.'); }
     catch (x) { md.el.querySelector('#delErr').textContent = x.message; }
   });
 }
@@ -1425,7 +1452,11 @@ $('cmd').addEventListener('blur', () => { setTimeout(() => { if (document.active
 $('rotFs').onclick = async () => { await enterImmersive(); };
 $('rotAnyway').onclick = () => document.body.classList.add('portrait-ok');
 syncFsButtons();
-document.querySelectorAll('[data-wish]').forEach(b => b.onclick = () => { b.textContent = 'On the list'; b.disabled = true; toast(`We'll tell you when ${b.dataset.wish} launches.`); });
+document.querySelectorAll('[data-wish]').forEach(b => {b.textContent='Notifications unavailable';b.disabled=true;b.title='Pending product decision; no subscription is stored.';});
+$('retrySave').onclick=()=>saveNow().catch(e=>toast(e.message));
+$('reloadSave').onclick=async()=>{if(!confirm('Discard pending progress and load the server save?'))return;try{const epoch=stateEpoch;const me=await api('GET','/api/me');if(epoch!==stateEpoch)return;applyMe(me,true);if(account)startGame();}catch(e){toast(e.message);}};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshMe();});
+setInterval(()=>refreshMe(),5000);
 
 async function boot(data) {
   const saved = load();
@@ -1433,6 +1464,7 @@ async function boot(data) {
   renderNav(); renderVerbs(); renderInv();
   try { const c = await api('GET', '/api/config'); catalog = c.catalog || {}; devMode = !!c.devMode; } catch (e) {}
   document.querySelectorAll('[data-price]').forEach(el => el.textContent = price(el.dataset.price));
+  $('buyHero').disabled=!catalog[SKU_GAME]?.sale_enabled; $('buyHero').title='Sales disabled pending content/provider/release approval';
   await refreshMe();
   const q = new URLSearchParams(location.search);
   if (q.has('signin') || q.has('purchase')) history.replaceState(null, '', location.pathname);
@@ -1441,7 +1473,7 @@ async function boot(data) {
   if (q.get('purchase') === 'cancelled') toast('Payment cancelled. You have not been charged.');
   if (q.get('purchase') === 'success') {
     const sku = q.get('sku'), has = () => sku === SKU_WALK ? ent.walk : ent.game;
-    toast('Payment received. Unlocking…');
+    toast('Checking payment confirmation…');
     for (let i = 0; i < 12 && !has(); i++) { await new Promise(r => setTimeout(r, 1500)); await refreshMe(); }
     if (has()) { toast(sku === SKU_WALK ? 'Walkthrough added. It stays hidden until you ask.' : 'Full game unlocked. Enjoy!'); if (game) startGame(); }
     else toast('Your payment is still being confirmed. Refresh in a minute.');
@@ -1452,7 +1484,7 @@ async function boot(data) {
   requestAnimationFrame(render);
 }
 boot();
-window.addEventListener('pagehide', () => { if (account && game) navigator.sendBeacon && fetch('/api/save', { method: 'PUT', keepalive: true, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ game_id: GAME_ID, data: game }) }).catch(() => {}); });
+// No unacknowledged pagehide write: pending state stays in memory and is visibly not saved.
 })();
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); }
 </script>

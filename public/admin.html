@@ -87,6 +87,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
       <div class="tile"><div class="k">Revenue, 30 days</div><div class="v" id="tRev30">$0</div><div class="s" id="tSales30">0 sales</div></div>
     </div>
 
+    <h2>Reconciliation required</h2><div class="box" id="reconciliation">Loading…</div>
     <h2>Recent sales</h2>
     <div class="scroll"><table>
       <thead><tr><th>When</th><th>Player</th><th>Product</th><th class="num">Amount</th><th>Status</th></tr></thead>
@@ -128,6 +129,8 @@ async function api(method, path, data) {
 
 async function loadStats() {
   const s = await api('GET', '/api/admin/stats');
+  const r = await api('GET','/api/admin/reconciliation');
+  $('reconciliation').textContent = [...r.payments.map(p=>`Payment ${p.payment_intent}: ${p.status}`),...r.receipts.map(p=>`Receipt ${p.purchase_id}: ${p.status} (provider acceptance not confirmed)`)].join(' · ') || 'No unresolved local payment/receipt records.';
   catalog = s.catalog || {};
   $('tUsers').textContent = s.users; $('tUsers30').textContent = `${s.users30} joined in 30 days`;
   $('tBuyers').textContent = s.buyers; $('tConv').textContent = `${s.users ? Math.round(s.buyers / s.users * 100) : 0}% of players`;
@@ -162,14 +165,14 @@ async function openUser(id) {
     </div>
     <div class="box"><h4>Saved game</h4>${d.saves.length ? d.saves.map(s => `<div class="meta">${esc(s.game_id)} · ${esc(s.room || '?')} · score ${esc(s.score ?? 0)} · saved ${when(s.updated_at)}</div>`).join('') : '<div class="meta">No saved game yet.</div>'}</div>
     <div class="box"><h4>Purchases</h4>${d.purchases.length ? `<table><thead><tr><th>Date</th><th>Product</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>${d.purchases.map(p => `<tr><td>${day(p.paid_at || p.created_at)}</td><td>${esc(shortSku(p.sku))}</td><td class="num">${money(p.amount_cents, p.currency)}</td><td><span class="pill ${p.status === 'paid' ? 'good' : p.status === 'refunded' ? 'bad' : 'warn'}">${esc(p.status === 'pending' ? 'checkout not finished' : p.status)}</span></td></tr>`).join('')}</tbody></table>` : '<div class="meta">No purchases.</div>'}</div>
-    <div class="box"><h4>Emails sent</h4>${d.emails.length ? `<table><tbody>${d.emails.map(m => `<tr><td>${when(m.created_at)}</td><td>${esc(m.kind)}</td><td><span class="pill ${m.status === 'sent' ? 'good' : 'bad'}">${esc(m.status)}</span>${m.error ? `<div class="meta">${esc(m.error)}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No emails yet.</div>'}</div>`;
+    <div class="box"><h4>Email provider acceptance (not delivery)</h4>${d.emails.length ? `<table><tbody>${d.emails.map(m => `<tr><td>${when(m.created_at)}</td><td>${esc(m.kind)}</td><td><span class="pill ${m.status === 'accepted' ? 'good' : 'bad'}">${esc(m.status)}</span>${m.error ? `<div class="meta">${esc(m.error)}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No emails yet.</div>'}</div>`;
   el.hidden = false; $('veil').hidden = false;
   const msg = (t, bad) => { const m = $('dMsg'); m.textContent = t; m.className = 'msg' + (bad ? ' err' : ''); };
-  const act = async (fn, okText, reopen = true) => { try { const r = await fn(); msg(okText + (r && r.dev_link ? ` Test link: ${r.dev_link}` : '')); if (reopen) { await openUser(id); msg(okText); } loadUsers(); loadStats(); } catch (e) { msg(e.message, true); } };
+  const act = async (fn, okText, reopen = true) => { try { await fn(); msg(okText); if (reopen) { await openUser(id); msg(okText); } loadUsers(); loadStats(); } catch (e) { msg(e.message, true); } };
   $('dClose').onclick = closeUser; $('dClose').focus();
   el.querySelectorAll('[data-grant]').forEach(b => b.onclick = () => act(() => api('POST', `/api/admin/users/${id}/grant`, { sku: b.dataset.grant }), 'Product given.'));
   el.querySelectorAll('[data-revoke]').forEach(b => b.onclick = () => { if (b.dataset.armed) return act(() => api('POST', `/api/admin/users/${id}/revoke`, { sku: b.dataset.revoke }), 'Product removed.'); b.dataset.armed = '1'; b.textContent = 'Click again to remove'; });
-  $('aLink').onclick = () => act(() => api('POST', `/api/admin/users/${id}/send-link`), 'Sign-in link sent.', false);
+  $('aLink').onclick = () => act(() => api('POST', `/api/admin/users/${id}/send-link`), 'Eligible email accepted by provider; delivery is not guaranteed.', false);
   $('aSignout').onclick = () => act(() => api('POST', `/api/admin/users/${id}/signout`), 'Signed out on all devices.', false);
   $('aReset').onclick = function () { if (this.dataset.armed) return act(() => api('POST', `/api/admin/users/${id}/reset-save`), 'Saved game reset.'); this.dataset.armed = '1'; this.textContent = 'Click again to reset'; };
 }

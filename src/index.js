@@ -16,13 +16,13 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
-      const res = await route(request, env, ctx, url);
-      if (res) return res;
-      return env.ASSETS.fetch(request);
+      if (env.DEV_MODE === '1' && !isLoopback(url)) throw new HttpError(503, 'Unsafe development configuration.');
+      const res = await route(request, env, ctx, url) || await env.ASSETS.fetch(request);
+      return secureResponse(res, url);
     } catch (err) {
-      if (err instanceof HttpError || err.status) return json({ error: err.message }, err.status);
-      console.error('Unhandled error', err && err.stack || err);
-      return json({ error: 'Something went wrong on our side. Please try again.' }, 500);
+      if (err instanceof HttpError || err.status) return secureResponse(json({ error: err.message }, err.status), url);
+      console.error('Unhandled platform error');
+      return secureResponse(json({ error: 'Something went wrong on our side. Please try again.' }, 500), url);
     }
   }
 };
@@ -33,7 +33,7 @@ async function route(req, env, ctx, url) {
   if (!p.startsWith('/api/') && !p.startsWith('/auth/')) return null;
   if (m !== 'GET' && m !== 'HEAD' && p !== '/api/stripe/webhook') checkSameOrigin(req, url);
 
-  if (p === '/api/config' && m === 'GET') return json({ catalog: publicCatalog(), devMode: env.DEV_MODE === '1' });
+  if (p === '/api/config' && m === 'GET') return json({ catalog: publicCatalog(env), devMode: false, saleEnabled: saleEnabled(env), saveVersion: 1 });
   if (p === '/api/me' && m === 'GET') return me(req, env);
   if (p === '/api/signup' && m === 'POST') return signup(req, env, url);
   if (p === '/api/login' && m === 'POST') return requestLogin(req, env, url);
@@ -46,7 +46,7 @@ async function route(req, env, ctx, url) {
   if (p === '/api/stripe/webhook' && m === 'POST') return stripeWebhook(req, env, ctx);
   if (p === '/api/hint' && m === 'POST') return revealHint(req, env);
   if (p === '/api/hints' && m === 'GET') return listHints(req, env, url);
-  if (p === '/api/dev/complete' && m === 'GET') return devComplete(req, env, url);
+
   if (p.startsWith('/api/admin/')) return admin(req, env, url);
   return json({ error: 'Not found' }, 404);
 }
@@ -62,7 +62,9 @@ function checkSameOrigin(req, url) {
   if (origin && origin !== url.origin) throw new HttpError(403, 'Requests from other sites are not allowed.');
 }
 async function body(req) {
-  try { return await req.json(); } catch { throw new HttpError(400, 'Send the request body as JSON.'); }
+  const raw=await req.text();
+  if(new TextEncoder().encode(raw).byteLength>16384) throw new HttpError(413,'Request body too large.');
+  try { const b=JSON.parse(raw); if(!b || typeof b!=='object' || Array.isArray(b)) throw new Error(); return b; } catch { throw new HttpError(400, 'Send the request body as a JSON object.'); }
 }
 function b64url(bytes) {
   let s = ''; for (const b of bytes) s += String.fromCharCode(b);
@@ -96,8 +98,33 @@ function sessionCookie(url, token, maxAge) {
 function isAdminEmail(env, email) {
   return String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean).includes(email);
 }
-function publicCatalog() {
-  return Object.fromEntries(Object.entries(CATALOG).map(([sku, p]) => [sku, { name: p.name, price_cents: p.price_cents, game: p.game, requires: p.requires || null }]));
+function publicCatalog(env = {}) {
+  return Object.fromEntries(Object.entries(CATALOG).map(([sku, p]) => [sku, { name: p.name, price_cents: p.price_cents, currency: 'usd', display_price: new Intl.NumberFormat('en-US', {style:'currency',currency:'USD'}).format(p.price_cents/100), sale_enabled: saleEnabled(env), game: p.game, requires: p.requires || null }]));
+}
+function saleEnabled(env) { return env.CONTENT_APPROVED === '1' && env.PROVIDER_APPROVED === '1' && env.RELEASE_APPROVED === '1' && !!env.STRIPE_SECRET_KEY && !!env.STRIPE_WEBHOOK_SECRET && (env.CURRENCY || 'usd') === 'usd' && env.STRIPE_AUTOMATIC_TAX !== '1'; }
+function isLoopback(url) { return ['localhost','127.0.0.1','[::1]'].includes(url.hostname); }
+function secureResponse(res, url) {
+  const h = new Headers(res.headers);
+  h.set('X-Content-Type-Options','nosniff'); h.set('Referrer-Policy','no-referrer'); h.set('X-Frame-Options','DENY');
+  h.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
+  h.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  if(url.protocol === 'https:') h.set('Strict-Transport-Security','max-age=31536000');
+  if (!/^\/icons\/[a-z0-9-]+\.png$/.test(url.pathname) && url.pathname !== '/manifest.webmanifest') h.set('Cache-Control','no-store');
+  return new Response(res.body,{status:res.status,statusText:res.statusText,headers:h});
+}
+async function limit(env, scope, subject, max, seconds) {
+  const window = Math.floor(now()/seconds)*seconds;
+  const row = await env.DB.prepare('INSERT INTO abuse_limits(scope,subject_hash,window_start,hits) VALUES(?,?,?,1) ON CONFLICT(scope,subject_hash,window_start) DO UPDATE SET hits=hits+1 RETURNING hits').bind(scope,await sha256(subject),window).first();
+  if(row.hits>max) throw new HttpError(429,'Too many requests. Try again later.');
+  await env.DB.prepare('DELETE FROM abuse_limits WHERE window_start < ?').bind(now()-DAY).run();
+}
+async function authProtection(req,env,url,email,b) {
+  await limit(env,'auth-ip',req.headers.get('cf-connecting-ip') || 'local',20,3600);
+  await limit(env,'auth-mail',email,5,3600);
+  if(!env.TURNSTILE_SECRET || !env.TURNSTILE_HOSTNAME || !b.turnstile_token) throw new HttpError(503,'Sign-in protection is not configured or proof is missing.');
+  if(!env.MAILTRAP_TOKEN || !env.MAIL_FROM_EMAIL || env.MAIL_FROM_EMAIL.endsWith('@example.com')) throw new HttpError(503,'Email configuration unavailable.');
+  let proof; try { const r=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',body:new URLSearchParams({secret:env.TURNSTILE_SECRET,response:String(b.turnstile_token)})}); proof=await r.json(); } catch { throw new HttpError(503,'Sign-in protection unavailable.'); }
+  if(!proof.success || proof.hostname!==env.TURNSTILE_HOSTNAME || proof.action!=='auth') throw new HttpError(403,'Sign-in protection failed.');
 }
 
 // ---------- Sessions ----------
@@ -125,7 +152,7 @@ async function entitlementsFor(env, userId) {
   return results.map(r => r.sku);
 }
 function userOut(u, env) {
-  return { id: u.id, email: u.email, name: u.name, verified: !!u.verified_at, isAdmin: isAdminEmail(env, u.email) };
+  return { id: u.id, email: u.email, name: u.name, verified: !!u.verified_at, isAdmin: !!u.verified_at && isAdminEmail(env, u.email) };
 }
 
 // ---------- Account endpoints ----------
@@ -135,16 +162,18 @@ async function me(req, env) {
   await env.DB.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').bind(now(), u.id).run();
   const [ents, saves] = await Promise.all([
     entitlementsFor(env, u.id),
-    env.DB.prepare('SELECT game_id, data, updated_at FROM saves WHERE user_id = ?').bind(u.id).all()
+    env.DB.prepare('SELECT game_id, data, version, revision, updated_at FROM saves WHERE user_id = ?').bind(u.id).all()
   ]);
   const saveMap = {};
-  for (const s of saves.results) { try { saveMap[s.game_id] = JSON.parse(s.data); } catch {} }
-  return json({ user: userOut(u, env), entitlements: ents, saves: saveMap });
+  const envelopes = {};
+  for (const s of saves.results) { try { saveMap[s.game_id] = JSON.parse(s.data); envelopes[s.game_id] = {version:s.version,data:saveMap[s.game_id],revision:s.revision}; } catch {} }
+  return json({ user: userOut(u, env), entitlements: ents, saves: saveMap, save_envelopes: envelopes });
 }
 
 async function signup(req, env, url) {
   const b = await body(req);
   const email = cleanEmail(b.email), name = cleanName(b.name);
+  await authProtection(req,env,url,email,b);
   const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
   if (existing) {
     // Never hand out a session for an existing email: send a sign-in link instead.
@@ -155,41 +184,46 @@ async function signup(req, env, url) {
   await env.DB.prepare('INSERT INTO users (id, email, name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)')
     .bind(id, email, name, now(), now()).run();
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
-  const token = await createSession(env, id);
   const dev = await sendLoginLink(env, url, user, 'welcome');
-  return json({ status: 'created', user: userOut(user, env), entitlements: [], saves: {}, ...dev }, 200, { 'set-cookie': sessionCookie(url, token, SESSION_DAYS * DAY) });
+  return json({ status: 'link_sent', ...dev });
 }
 
 async function requestLogin(req, env, url) {
   const b = await body(req);
   const email = cleanEmail(b.email);
+  await authProtection(req,env,url,email,b);
   const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
   let dev = {};
   if (user) dev = await sendLoginLink(env, url, user, 'login');
+  else {
+    const recent=await env.DB.prepare("SELECT 1 FROM email_log WHERE to_email=? AND kind='login' AND status='accepted' AND created_at>?").bind(email,now()-EMAIL_COOLDOWN_SECONDS).first();
+    if(!recent && !await deliver(env,{id:null,email,name:'Player'},'login',{subject:'Retro Quest sign-in request',text:'If you do not have an account, create one in the arcade. No account access was granted.'})) throw new HttpError(503,'Email could not be accepted. Please try again later.');
+  }
   // Same answer whether or not the account exists, so emails can't be probed.
   return json({ status: 'link_sent', ...dev });
 }
 
 async function sendLoginLink(env, url, user, kind) {
-  const recent = await env.DB.prepare("SELECT created_at FROM email_log WHERE to_email = ? AND kind IN ('login','welcome') AND created_at > ? ORDER BY created_at DESC LIMIT 1")
+  const recent = await env.DB.prepare("SELECT created_at FROM email_log WHERE to_email = ? AND kind IN ('login','welcome') AND status='accepted' AND created_at > ? ORDER BY created_at DESC LIMIT 1")
     .bind(user.email, now() - EMAIL_COOLDOWN_SECONDS).first();
-  if (recent) throw new HttpError(429, 'We just sent you an email. Check your inbox, or try again in a minute.');
+  if (recent) return {};
   const token = randomToken();
   await env.DB.prepare('INSERT INTO login_tokens (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
     .bind(await sha256(token), user.id, now(), now() + LOGIN_LINK_MINUTES * 60).run();
   const link = `${url.origin}/auth/link?token=${encodeURIComponent(token)}`;
   const mail = kind === 'welcome' ? emails.welcome(env, user, link) : emails.login(env, user, link, LOGIN_LINK_MINUTES);
-  await deliver(env, user, kind, mail);
-  return env.DEV_MODE === '1' ? { dev_link: link } : {};
+  const accepted = await deliver(env, user, kind, mail);
+  if(!accepted) { await env.DB.prepare('DELETE FROM login_tokens WHERE token_hash = ?').bind(await sha256(token)).run(); throw new HttpError(503,'Email could not be accepted. Please try again later.'); }
+  return {};
 }
 
 async function deliver(env, user, kind, mail) {
-  let status = 'sent', error = null;
+  let status = 'accepted', error = null;
   try { await sendEmail(env, { to: user.email, toName: user.name, ...mail, category: kind }); }
-  catch (e) { status = 'failed'; error = String(e.message || e).slice(0, 500); console.error('Email failed', kind, error); }
+  catch (e) { status = 'failed'; error = 'Email provider unavailable'; }
   await env.DB.prepare('INSERT INTO email_log (user_id, kind, to_email, status, error, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .bind(user.id, kind, user.email, status, error, now()).run();
-  return status === 'sent';
+  return status === 'accepted';
 }
 
 async function useLoginLink(req, env, url) {
@@ -198,11 +232,13 @@ async function useLoginLink(req, env, url) {
   if (!row || row.used_at || row.expires_at < now()) {
     return Response.redirect(`${url.origin}/?signin=expired`, 302);
   }
-  await env.DB.batch([
-    env.DB.prepare('UPDATE login_tokens SET used_at = ? WHERE token_hash = ?').bind(now(), row.token_hash),
-    env.DB.prepare('UPDATE users SET verified_at = COALESCE(verified_at, ?), last_seen_at = ? WHERE id = ?').bind(now(), now(), row.user_id)
+  const session = randomToken(), sh = await sha256(session);
+  const results = await env.DB.batch([
+    env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at) SELECT ?,user_id,?,? FROM login_tokens WHERE token_hash=? AND used_at IS NULL AND expires_at>?').bind(sh,now(),now()+SESSION_DAYS*DAY,row.token_hash,now()),
+    env.DB.prepare('UPDATE login_tokens SET used_at=?,consumed_session=? WHERE token_hash=? AND used_at IS NULL AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(now(),sh,row.token_hash,sh),
+    env.DB.prepare('UPDATE users SET verified_at=COALESCE(verified_at,?),last_seen_at=? WHERE id=? AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(now(),now(),row.user_id,sh)
   ]);
-  const session = await createSession(env, row.user_id);
+  if(!results[0].meta.changes) return Response.redirect(`${url.origin}/?signin=expired`,302);
   return new Response(null, { status: 302, headers: { location: `${url.origin}/?signin=ok`, 'set-cookie': sessionCookie(url, session, SESSION_DAYS * DAY) } });
 }
 
@@ -229,10 +265,10 @@ async function deleteAccount(req, env) {
     env.DB.prepare('DELETE FROM login_tokens WHERE user_id = ?').bind(u.id),
     env.DB.prepare('DELETE FROM saves WHERE user_id = ?').bind(u.id),
     env.DB.prepare('DELETE FROM hint_reveals WHERE user_id = ?').bind(u.id),
-    env.DB.prepare('DELETE FROM entitlements WHERE user_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM entitlement_contributions WHERE user_id = ?').bind(u.id),
     // Purchases are kept for accounting, but detached from personal data.
-    env.DB.prepare("UPDATE purchases SET user_id = 'deleted' WHERE user_id = ?").bind(u.id),
-    env.DB.prepare("UPDATE email_log SET to_email = 'deleted', user_id = NULL WHERE user_id = ?").bind(u.id),
+    env.DB.prepare('UPDATE purchases SET user_id = NULL WHERE user_id = ?').bind(u.id),
+    env.DB.prepare('DELETE FROM email_log WHERE user_id = ? OR to_email = ?').bind(u.id,u.email),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(u.id)
   ]);
   return json({ ok: true }, 200, { 'set-cookie': 'rq_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
@@ -242,13 +278,17 @@ async function deleteAccount(req, env) {
 async function putSave(req, env) {
   const u = await requireUser(req, env);
   const raw = await req.text();
-  if (raw.length > MAX_SAVE_BYTES) throw new HttpError(413, 'Save file is too large.');
+  if (new TextEncoder().encode(raw).byteLength > MAX_SAVE_BYTES) throw new HttpError(413, 'Save file is too large.');
   let b; try { b = JSON.parse(raw); } catch { throw new HttpError(400, 'Send the save as JSON.'); }
+  if(!b || b.version !== 1 || !Number.isSafeInteger(b.revision) || b.revision < 0 || !b.data || typeof b.data !== 'object' || Array.isArray(b.data)) throw new HttpError(400,'Save version 1, object data and a CAS revision are required.');
   const gameId = String(b.game_id || '');
   if (!GAMES[gameId]) throw new HttpError(400, 'Unknown game.');
-  await env.DB.prepare('INSERT INTO saves (user_id, game_id, data, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, game_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
-    .bind(u.id, gameId, JSON.stringify(b.data ?? null), now()).run();
-  return json({ ok: true, updated_at: now() });
+  await limit(env,'save',u.id,120,60);
+  const row = await env.DB.prepare('INSERT INTO saves(user_id,game_id,data,updated_at,version,revision) SELECT ?,?,?,?,1,1 WHERE ?=0 ON CONFLICT(user_id,game_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at,version=1,revision=saves.revision+1 WHERE saves.revision=? RETURNING revision').bind(u.id,gameId,JSON.stringify(b.data),now(),b.revision,b.revision).first();
+  // INSERT SELECT above only inserts revision 0; existing saves use an atomic UPDATE.
+  const updated = row || (b.revision > 0 && await env.DB.prepare('UPDATE saves SET data=?,updated_at=?,version=1,revision=revision+1 WHERE user_id=? AND game_id=? AND revision=? RETURNING revision').bind(JSON.stringify(b.data),now(),u.id,gameId,b.revision).first());
+  if(!updated) throw new HttpError(409,'Save conflict. Keep your pending snapshot; reload server progress before choosing a recovery.');
+  return json({ ok: true, acknowledged: true, revision: updated.revision, updated_at: now() });
 }
 
 // ---------- Payments ----------
@@ -262,13 +302,8 @@ async function checkout(req, env, url) {
   if (owned.includes(sku)) throw new HttpError(409, 'You already own this.');
   if (product.requires && !owned.includes(product.requires)) throw new HttpError(409, `Buy ${CATALOG[product.requires].name} first.`);
 
-  if (!env.STRIPE_SECRET_KEY) {
-    if (env.DEV_MODE !== '1') throw new HttpError(503, 'Payments are not set up yet.');
-    const fakeId = 'dev_' + randomToken(12);
-    await env.DB.prepare('INSERT INTO purchases (id, user_id, sku, amount_cents, currency, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(fakeId, u.id, sku, product.price_cents, env.CURRENCY || 'usd', 'pending', now()).run();
-    return json({ url: `${url.origin}/api/dev/complete?session=${fakeId}` });
-  }
+  if (!u.verified_at || !saleEnabled(env)) throw new HttpError(503, 'Sales are disabled pending content, provider and release approval.');
+  await limit(env,'checkout',u.id,10,3600);
 
   const session = await createCheckout(env, {
     product, sku, user: u,
@@ -280,59 +315,49 @@ async function checkout(req, env, url) {
   return json({ url: session.url });
 }
 
-async function fulfil(env, { sessionId, userId, sku, amount, currency, paymentIntent, customerId }) {
-  const product = CATALOG[sku];
-  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
-  if (!product || !user) { console.error('Fulfil: unknown user or product', userId, sku); return; }
-  const existing = await env.DB.prepare('SELECT status FROM purchases WHERE id = ?').bind(sessionId).first();
-  if (existing && existing.status === 'paid') return;
-  const stmts = [
-    existing
-      ? env.DB.prepare('UPDATE purchases SET status = ?, paid_at = ?, payment_intent = ?, amount_cents = ?, currency = ? WHERE id = ?').bind('paid', now(), paymentIntent, amount, currency, sessionId)
-      : env.DB.prepare('INSERT INTO purchases (id, user_id, sku, amount_cents, currency, status, payment_intent, created_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(sessionId, userId, sku, amount, currency, 'paid', paymentIntent, now(), now()),
-    env.DB.prepare('INSERT OR IGNORE INTO entitlements (user_id, sku, granted_at, source) VALUES (?, ?, ?, ?)').bind(userId, sku, now(), 'stripe')
-  ];
-  if (customerId) stmts.push(env.DB.prepare('UPDATE users SET stripe_customer_id = COALESCE(stripe_customer_id, ?) WHERE id = ?').bind(customerId, userId));
-  await env.DB.batch(stmts);
-  await deliver(env, user, 'receipt', emails.receipt(env, user, product, amount, currency));
-}
-
-async function stripeWebhook(req, env, ctx) {
+async function stripeWebhook(req, env) {
   const raw = await req.text();
-  const ok = await verifyStripeSignature(raw, req.headers.get('stripe-signature'), env.STRIPE_WEBHOOK_SECRET);
-  if (!ok) return json({ error: 'Bad signature' }, 400);
-  const event = JSON.parse(raw);
-  const seen = await env.DB.prepare('SELECT id FROM stripe_events WHERE id = ?').bind(event.id).first();
-  if (seen) return json({ received: true, duplicate: true });
-
-  const obj = event.data && event.data.object || {};
-  if ((event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') && obj.payment_status === 'paid') {
-    const md = obj.metadata || {};
-    await fulfil(env, {
-      sessionId: obj.id, userId: md.user_id || obj.client_reference_id, sku: md.sku,
-      amount: obj.amount_total, currency: obj.currency, paymentIntent: obj.payment_intent, customerId: obj.customer
-    });
-  } else if (event.type === 'charge.refunded' && obj.refunded) {
-    const p = await env.DB.prepare('SELECT * FROM purchases WHERE payment_intent = ?').bind(obj.payment_intent).first();
-    if (p) {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE purchases SET status = 'refunded' WHERE id = ?").bind(p.id),
-        env.DB.prepare("DELETE FROM entitlements WHERE user_id = ? AND sku = ? AND source = 'stripe'").bind(p.user_id, p.sku)
-      ]);
-    }
+  if(new TextEncoder().encode(raw).byteLength > 256*1024) throw new HttpError(413,'Webhook too large.');
+  if(!await verifyStripeSignature(raw,req.headers.get('stripe-signature'),env.STRIPE_WEBHOOK_SECRET)) throw new HttpError(400,'Bad signature');
+  let event; try {event=JSON.parse(raw);} catch {throw new HttpError(400,'Invalid event');}
+  if(!event || typeof event.id !== 'string' || !event.id || typeof event.type !== 'string') throw new HttpError(400,'Invalid event');
+  const seen=await env.DB.prepare('SELECT id FROM stripe_events WHERE id=?').bind(event.id).first();
+  if(seen) return json({received:true,duplicate:true});
+  const obj=event.data?.object || {}, key=randomToken(), n=now();
+  const gate='EXISTS(SELECT 1 FROM stripe_events WHERE id=? AND claim_key=? AND processed_at IS NULL)';
+  const stmt=(sql,...args)=>env.DB.prepare(sql).bind(...args,event.id,key);
+  const stmts=[env.DB.prepare('INSERT OR IGNORE INTO stripe_events(id,type,received_at,claim_key) VALUES(?,?,?,?)').bind(event.id,event.type,n,key)];
+  if(['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(event.type) && obj.payment_status==='paid') {
+    const p=await env.DB.prepare('SELECT * FROM purchases WHERE id=?').bind(obj.id).first();
+    const md=obj.metadata || {}, product=CATALOG[md.sku];
+    if(!p || !product || (p.user_id!==null && md.user_id !== p.user_id) || md.sku!==p.sku || (obj.client_reference_id && p.user_id!==null && obj.client_reference_id!==p.user_id) || obj.amount_total!==product.price_cents || obj.amount_total!==p.amount_cents || obj.currency!=='usd' || p.currency!=='usd' || typeof obj.payment_intent!=='string' || !obj.payment_intent || (p.payment_intent && p.payment_intent!==obj.payment_intent)) throw new HttpError(400,'Purchase validation failed');
+    const linked=await env.DB.prepare('SELECT id FROM purchases WHERE payment_intent=? AND id!=?').bind(obj.payment_intent,obj.id).first();
+    if(linked) throw new HttpError(400,'Payment intent already linked');
+    stmts.push(stmt(`UPDATE purchases SET payment_intent=?,paid_at=COALESCE(paid_at,?),status=CASE WHEN EXISTS(SELECT 1 FROM payment_terminals WHERE payment_intent=? AND status='refunded') THEN 'refunded' WHEN EXISTS(SELECT 1 FROM payment_terminals WHERE payment_intent=?) THEN 'reconciliation-required' ELSE 'paid' END WHERE id=? AND status='pending' AND ${gate}`,obj.payment_intent,n,obj.payment_intent,obj.payment_intent,p.id));
+    stmts.push(stmt(`INSERT OR IGNORE INTO entitlement_contributions(user_id,sku,source_id,source,purchase_id,granted_at) SELECT user_id,sku,id,'stripe',id,? FROM purchases WHERE id=? AND status='paid' AND user_id IS NOT NULL AND ${gate}`,n,p.id));
+    stmts.push(stmt(`INSERT OR IGNORE INTO receipt_outbox(purchase_id,status,updated_at) SELECT id,'pending',? FROM purchases WHERE id=? AND status='paid' AND user_id IS NOT NULL AND ${gate}`,n,p.id));
+  } else if(event.type==='charge.refunded' || event.type.startsWith('charge.dispute.')) {
+    if(typeof obj.payment_intent!=='string' || !obj.payment_intent) throw new HttpError(400,'Missing payment intent');
+    const full=event.type==='charge.refunded' && obj.refunded===true && Number.isSafeInteger(obj.amount) && obj.amount>0 && obj.amount_refunded===obj.amount;
+    const state=full?'refunded':'reconciliation-required';
+    stmts.push(stmt(`INSERT INTO payment_terminals(payment_intent,status,updated_at) SELECT ?,?,? WHERE ${gate} ON CONFLICT(payment_intent) DO UPDATE SET status=CASE WHEN payment_terminals.status='refunded' THEN 'refunded' ELSE excluded.status END,updated_at=excluded.updated_at`,obj.payment_intent,state,n));
+    stmts.push(stmt(`UPDATE purchases SET status=(SELECT status FROM payment_terminals WHERE payment_intent=?) WHERE payment_intent=? AND ${gate}`,obj.payment_intent,obj.payment_intent));
+    if(full) stmts.push(stmt(`UPDATE entitlement_contributions SET revoked_at=? WHERE purchase_id IN(SELECT id FROM purchases WHERE payment_intent=?) AND ${gate}`,n,obj.payment_intent));
   }
-  await env.DB.prepare('INSERT OR IGNORE INTO stripe_events (id, type, received_at) VALUES (?, ?, ?)').bind(event.id, event.type, now()).run();
-  return json({ received: true });
+  stmts.push(stmt(`UPDATE stripe_events SET processed_at=? WHERE ${gate}`,n));
+  const result=await env.DB.batch(stmts);
+  if(result[0].meta.changes && ['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(event.type)) await dispatchReceipt(env,obj.id);
+  return json({received:true,duplicate:!result[0].meta.changes});
 }
-
-// Local testing only: pretend Stripe finished the payment.
-async function devComplete(req, env, url) {
-  if (env.DEV_MODE !== '1') return json({ error: 'Not found' }, 404);
-  const id = url.searchParams.get('session') || '';
-  const p = await env.DB.prepare('SELECT * FROM purchases WHERE id = ?').bind(id).first();
-  if (!p) return json({ error: 'Unknown test purchase' }, 404);
-  await fulfil(env, { sessionId: p.id, userId: p.user_id, sku: p.sku, amount: p.amount_cents, currency: p.currency, paymentIntent: 'pi_dev_' + p.id });
-  return Response.redirect(`${url.origin}/?purchase=success&sku=${encodeURIComponent(p.sku)}`, 302);
+async function dispatchReceipt(env,id) {
+  const claim=await env.DB.prepare("UPDATE receipt_outbox SET status='sending',updated_at=? WHERE purchase_id=? AND status='pending' RETURNING purchase_id").bind(now(),id).first();
+  if(!claim)return;
+  const p=await env.DB.prepare('SELECT * FROM purchases WHERE id=?').bind(id).first();
+  const user=p?.user_id && await env.DB.prepare('SELECT * FROM users WHERE id=?').bind(p.user_id).first();
+  let status='cancelled';
+  if(user && p.status==='paid') status=await deliver(env,user,'receipt',emails.receipt(env,user,CATALOG[p.sku],p.amount_cents,p.currency))?'accepted':'failed';
+  await env.DB.prepare('UPDATE receipt_outbox SET status=?,updated_at=? WHERE purchase_id=?').bind(status,now(),id).run();
+  // A crash in sending is reconciliation-required, never a claimed inbox delivery.
 }
 
 // ---------- Hints (served only to walkthrough owners) ----------
@@ -368,8 +393,12 @@ async function listHints(req, env, url) {
 // ---------- Admin ----------
 async function admin(req, env, url) {
   const u = await requireUser(req, env);
-  if (!isAdminEmail(env, u.email)) throw new HttpError(403, 'Admins only.');
+  if (!u.verified_at || !isAdminEmail(env, u.email)) throw new HttpError(403, 'Verified admins only.');
   const p = url.pathname.replace('/api/admin', ''), m = req.method;
+  if(m!=='GET') await limit(env,'admin',u.id,60,60);
+  const audit = (target,action,sku=null) => env.DB.prepare('INSERT INTO admin_audit(actor_id,target_id,action,sku,created_at) VALUES(?,?,?,?,?)').bind(u.id,target,action,sku,now());
+  if(p==='/audit' && m==='GET') return json({audit:(await env.DB.prepare('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 100').all()).results});
+  if(p==='/reconciliation' && m==='GET') return json({payments:(await env.DB.prepare("SELECT * FROM payment_terminals WHERE status='reconciliation-required' ORDER BY updated_at DESC LIMIT 100").all()).results,receipts:(await env.DB.prepare("SELECT * FROM receipt_outbox WHERE status IN ('pending','sending','failed') ORDER BY updated_at DESC LIMIT 100").all()).results});
 
   if (p === '/stats' && m === 'GET') {
     const since = now() - 30 * DAY;
@@ -408,29 +437,40 @@ async function admin(req, env, url) {
         env.DB.prepare('SELECT game_id, updated_at, data FROM saves WHERE user_id = ?').bind(target.id).all()
       ]);
       const saves = save.results.map(s => { let d = {}; try { d = JSON.parse(s.data) || {}; } catch {} return { game_id: s.game_id, updated_at: s.updated_at, room: d.room, score: d.score }; });
-      return json({ user: { ...target, isAdmin: isAdminEmail(env, target.email) }, entitlements: ents.results, purchases: purchases.results, emails: mails.results, hints: hints.n, saves });
+      return json({ user: { ...target, isAdmin: !!target.verified_at && isAdminEmail(env, target.email) }, entitlements: ents.results, purchases: purchases.results, emails: mails.results, hints: hints.n, saves });
     }
     if (action === '/grant' && m === 'POST') {
       const b = await body(req); const sku = String(b.sku || '');
       if (!CATALOG[sku]) throw new HttpError(400, 'Unknown product.');
-      await env.DB.prepare('INSERT OR IGNORE INTO entitlements (user_id, sku, granted_at, source) VALUES (?, ?, ?, ?)').bind(target.id, sku, now(), 'admin').run();
+      const owned = await entitlementsFor(env,target.id);
+      if(CATALOG[sku].requires && !owned.includes(CATALOG[sku].requires)) throw new HttpError(409,'Grant the base game first.');
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM access_revocations WHERE user_id=? AND sku=?').bind(target.id,sku),
+        env.DB.prepare("INSERT INTO entitlement_contributions(user_id,sku,source_id,source,granted_at) VALUES(?,?,'admin','admin',?) ON CONFLICT(user_id,sku,source_id) DO UPDATE SET revoked_at=NULL,granted_at=excluded.granted_at").bind(target.id,sku,now()),
+        audit(target.id,'grant',sku)
+      ]);
       return json({ ok: true });
     }
     if (action === '/revoke' && m === 'POST') {
       const b = await body(req); const sku = String(b.sku || '');
-      await env.DB.prepare('DELETE FROM entitlements WHERE user_id = ? AND sku = ?').bind(target.id, sku).run();
+      if(!CATALOG[sku]) throw new HttpError(400,'Unknown product.');
+      await env.DB.batch([
+        env.DB.prepare('INSERT INTO access_revocations VALUES(?,?,?) ON CONFLICT(user_id,sku) DO UPDATE SET revoked_at=excluded.revoked_at').bind(target.id,sku,now()),
+        env.DB.prepare('UPDATE entitlement_contributions SET revoked_at=? WHERE user_id=? AND sku=?').bind(now(),target.id,sku), audit(target.id,'revoke',sku)
+      ]);
       return json({ ok: true });
     }
     if (action === '/send-link' && m === 'POST') {
+      await audit(target.id,'send-link').run();
       const dev = await sendLoginLink(env, url, target, 'login');
       return json({ ok: true, ...dev });
     }
     if (action === '/reset-save' && m === 'POST') {
-      await env.DB.prepare('DELETE FROM saves WHERE user_id = ?').bind(target.id).run();
+      await env.DB.batch([env.DB.prepare("UPDATE saves SET data='null',revision=revision+1,updated_at=? WHERE user_id=?").bind(now(),target.id), audit(target.id,'reset-save')]);
       return json({ ok: true });
     }
     if (action === '/signout' && m === 'POST') {
-      await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id).run();
+      await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id), audit(target.id,'signout')]);
       return json({ ok: true });
     }
   }

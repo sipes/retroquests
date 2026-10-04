@@ -1,8 +1,13 @@
-# Copy to .dev.vars for local testing with `npm run dev`.
-# DEV_MODE=1 fakes payments (no Stripe) and prints emails to the log (no Mailtrap).
-DEV_MODE=1
-# Optional: uncomment to test real email/payments locally
+# Local-only examples. No payment bypass, token logging or email-success fallback.
+# Do not copy these into production or use the root config for the synthetic tests.
+DEV_MODE=0
+CONTENT_APPROVED=0
+PROVIDER_APPROVED=0
+RELEASE_APPROVED=0
+# Dedicated environment secrets must be supplied through approved secret tooling.
 # MAILTRAP_TOKEN=
 # MAILTRAP_INBOX_ID=
 # STRIPE_SECRET_KEY=
 # STRIPE_WEBHOOK_SECRET=
+# TURNSTILE_SECRET=
+# TURNSTILE_HOSTNAME=

@@ -12,6 +12,7 @@
     "db:migrate:local": "wrangler d1 migrations apply retro-quest-db --local"
   },
   "devDependencies": {
+    "playwright": "^1.63.0",
     "wrangler": "^4"
   }
 }

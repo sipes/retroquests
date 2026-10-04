@@ -1,0 +1,6 @@
+{
+ "name":"retro-quest-local-synthetic","main":"../../src/index.js","compatibility_date":"2026-09-01",
+ "assets":{"directory":"../../public","binding":"ASSETS","run_worker_first":true},
+ "d1_databases":[{"binding":"DB","database_name":"retro-quest-db","database_id":"REPLACE_WITH_YOUR_DATABASE_ID","migrations_dir":"../../migrations"}],
+ "vars":{"SITE_NAME":"Synthetic local Retro Quest","ADMIN_EMAILS":"admin@example.test","DEV_MODE":"0","CURRENCY":"usd","CONTENT_APPROVED":"0","PROVIDER_APPROVED":"0","RELEASE_APPROVED":"0","STRIPE_WEBHOOK_SECRET":"synthetic-local-only-not-a-provider-secret"}
+}

@@ -1,0 +1,13 @@
+<!doctype html><html><head><title>Local inert adapter test</title></head><body><h1>DEVELOPMENT FIXTURES / NO REAL PAYMENT</h1><p>Inert platform stub; not a game or live API verification.</p><button id="switch">Switch synthetic account</button><button id="revoke">Revoke access</button><div id="root"></div><p id="counts"></p><script type="module">
+import {createPlatform,mountPlatformGame} from '/platform.js';import {mountStub} from '/stub.js';
+let user='A',access=['port-lucky'],destroyed=0,mounted=0;
+const platform=createPlatform({fetch:async(path,opts)=>{
+ if(path==='/api/me')return Response.json({user:{id:user},entitlements:access,save_envelopes:{}});
+ if(path==='/api/config')return Response.json({catalog:{'port-lucky':{display_price:'$7.99',sale_enabled:false}}});
+ return Response.json({error:'Synthetic save conflict'},{status:409});
+},requestSignIn:async()=>{},requestPurchase:async()=>{throw new Error('No real purchase');}});
+const host=await mountPlatformGame({root:document.querySelector('#root'),platform,gameId:'port-lucky',interval:60000,mount:async args=>{mounted++;const r=await mountStub({...args,onDestroy:()=>destroyed++});counts();return r;}});
+function counts(){document.querySelector('#counts').textContent=`Mounts ${mounted}; destroys ${destroyed}`;}
+document.querySelector('#switch').onclick=async()=>{user=user==='A'?'B':'A';await host.refresh();counts();};
+document.querySelector('#revoke').onclick=async()=>{access=[];await host.refresh();counts();};
+</script></body></html>

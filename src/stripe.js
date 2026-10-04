@@ -21,20 +21,18 @@ export async function createCheckout(env, { product, sku, user, successUrl, canc
     line_items: { 0: {
       quantity: 1,
       price_data: {
-        currency: env.CURRENCY || 'usd',
+        currency: 'usd',
         unit_amount: product.price_cents,
         product_data: { name: product.name, description: product.description, metadata: { sku } },
-        tax_behavior: env.STRIPE_AUTOMATIC_TAX === '1' ? 'exclusive' : undefined
+        tax_behavior: 'exclusive'
       }
     } },
-    allow_promotion_codes: 'true'
+    allow_promotion_codes: 'false',
+    automatic_tax: { enabled: 'false' }
   };
   if (user.stripe_customer_id) params.customer = user.stripe_customer_id;
   else { params.customer_email = user.email; params.customer_creation = 'always'; }
-  if (env.STRIPE_AUTOMATIC_TAX === '1') {
-    params.automatic_tax = { enabled: 'true' };
-    if (user.stripe_customer_id) params.customer_update = { address: 'auto' };
-  }
+
 
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
@@ -43,7 +41,7 @@ export async function createCheckout(env, { product, sku, user, successUrl, canc
   });
   const data = await res.json();
   if (!res.ok) {
-    console.error('Stripe error', JSON.stringify(data));
+
     throw Object.assign(new Error('The payment page could not be opened. Please try again.'), { status: 502 });
   }
   return data;

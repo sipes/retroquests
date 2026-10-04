@@ -1,7 +1,7 @@
 // Emails sent through the Mailtrap API.
 // MAILTRAP_INBOX_ID set  -> goes to your Mailtrap test inbox (nobody real receives it).
 // MAILTRAP_INBOX_ID unset -> real delivery; needs a sending domain verified in Mailtrap.
-// No MAILTRAP_TOKEN       -> printed to the log only (local testing).
+// Missing configuration fails closed. Tests replace fetch, not this policy.
 
 export async function sendEmail(env, { to, toName, subject, text, html, category }) {
   const payload = {
@@ -10,8 +10,7 @@ export async function sendEmail(env, { to, toName, subject, text, html, category
     subject, text, html, category
   };
   if (!env.MAILTRAP_TOKEN) {
-    console.log(`[email:${category}] to=${to} subject="${subject}"\n${text}`);
-    return { logged: true };
+    throw new Error('Email configuration unavailable');
   }
   const endpoint = env.MAILTRAP_INBOX_ID
     ? `https://sandbox.api.mailtrap.io/api/send/${env.MAILTRAP_INBOX_ID}`
@@ -21,7 +20,7 @@ export async function sendEmail(env, { to, toName, subject, text, html, category
     headers: { authorization: `Bearer ${env.MAILTRAP_TOKEN}`, 'content-type': 'application/json' },
     body: JSON.stringify(payload)
   });
-  if (!res.ok) throw new Error(`Mailtrap ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw new Error('Email provider rejected request');
   return res.json().catch(() => ({}));
 }
 
