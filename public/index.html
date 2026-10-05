@@ -1378,7 +1378,8 @@ function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false
 
 /* ---------- Inventory sheet (phones) ---------- */
 function openInventory() {
-  if (msgOpen || blocking || !game) return;
+  // Browsing/selecting items does not advance dialogue; scene actions remain gated.
+  if (blocking || !game || document.querySelector('.inv-sheet')) return;
   const m = modal(`<div class="modal inv-sheet" role="dialog" aria-labelledby="invT"><div class="inv-head"><h3 id="invT">Inventory</h3><button class="btn small ghost" data-a="close">Close</button></div><div class="inv-grid" id="invGrid"></div></div>`);
   m.el.querySelector('[data-a=close]').onclick = () => m.close();
   const g = m.el.querySelector('#invGrid');

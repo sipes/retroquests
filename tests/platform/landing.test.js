@@ -20,9 +20,12 @@ test('landing has honest demo, development and planned SKU-specific pricing',()=
   assert.equal((home.match(/data-price="port-lucky"/g)||[]).length,1);
   assert.match(home,/Planned pricing · USD/);
 });
-test('original landing handlers and hardened inline JS are byte-identical to approved base',()=>{
+test('original handlers and hardened inline JS are unchanged except the approved inventory dialogue guard',()=>{
   const scripts=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
-  assert.equal(createHash('sha256').update(scripts.at(-1)[1]).digest('hex'),'94553e423c3d10a050fd46b51872bffe089fd9b099ff0c608f0fcf274ccdb90f');
+  const updated='function openInventory() {\n  // Browsing/selecting items does not advance dialogue; scene actions remain gated.\n  if (blocking || !game || document.querySelector(\'.inv-sheet\')) return;';
+  assert.ok(scripts.at(-1)[1].includes(updated));
+  const normalized=scripts.at(-1)[1].replace(updated,'function openInventory() {\n  if (msgOpen || blocking || !game) return;');
+  assert.equal(createHash('sha256').update(normalized).digest('hex'),'94553e423c3d10a050fd46b51872bffe089fd9b099ff0c608f0fcf274ccdb90f');
   assert.match(html,/document\.querySelectorAll\('\[data-price\]'\)\.forEach\(el => el\.textContent = price\(el\.dataset\.price\)\)/);
 });
 test('actual worker config keeps full-game and optional-hint prices distinct and sales disabled',async()=>{
