@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createPurchaseReturn} from '../../public/purchase-return.js';
+const state=(owned=false,id='A',verified=true)=>({user:id?{id,verified}:null,entitlements:owned?['port-lucky']:[]});
+function setup(states){let reads=0,starts=0;const messages=[];const flow=createPurchaseReturn({read:async()=>{const s=states[Math.min(reads++,states.length-1)];if(s instanceof Error)throw s;return s;},resume:async()=>{starts++;},status:s=>messages.push(s),wait:async()=>{},delays:[0,0]});return {flow,messages,get reads(){return reads;},get starts(){return starts;}};}
+test('verified ownership resumes once; concurrent callbacks share work',async()=>{const s=setup([state(true)]);await Promise.all([s.flow.run('success','port-lucky'),s.flow.run('success','port-lucky')]);assert.equal(s.starts,1);assert.equal(s.reads,1);});
+test('late server grant retries then resumes',async()=>{const s=setup([state(),state(),state(true)]);await s.flow.run('success','port-lucky');assert.equal(s.starts,1);assert.equal(s.reads,3);});
+test('timeout stays truthful and bounded; explicit retry can recover',async()=>{const s=setup([state()]);await s.flow.run('success','port-lucky');assert.equal(s.reads,3);assert.equal(s.starts,0);assert.match(s.messages.at(-1).text,/not confirmed/);assert.equal(s.messages.at(-1).retry,true);await s.flow.run('success','port-lucky');assert.equal(s.reads,3);});
+test('cancel, unknown SKU and walkthrough never auto-start game',async()=>{for(const [result,sku] of [['cancelled','port-lucky'],['success','bad'],['success','port-lucky-walkthrough']]){const s=setup([state(true)]);await s.flow.run(result,sku);assert.equal(s.starts,0);}});
+test('signed out, unverified and switched identities never resume',async()=>{for(const states of [[state(true,null)],[state(true,'A',false)],[state(),state(true,'B')]]){const s=setup(states);await s.flow.run('success','port-lucky');assert.equal(s.starts,0);}});
+test('explicit retry recovers and concurrent retry clicks share one check',async()=>{const s=setup([state(),state(),state(),state(true)]);await s.flow.run('success','port-lucky');await Promise.all([s.flow.run('success','port-lucky',{retry:true}),s.flow.run('success','port-lucky',{retry:true})]);assert.equal(s.reads,4);assert.equal(s.starts,1);});
+test('network failure never invents ownership',async()=>{const s=setup([new Error('offline')]);await s.flow.run('success','port-lucky');assert.equal(s.starts,0);assert.equal(s.reads,3);assert.match(s.messages.at(-1).text,/not confirmed/);});

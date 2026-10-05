@@ -1,22 +1,35 @@
 import {createPortLuckyHost,mountManaged as mount} from './port-lucky-platform.js';
 import {drawLandingArt} from './landing-art.js';
 import {authProof} from './auth-proof.js';
+import {createPurchaseReturn} from './purchase-return.js';
 const $=id=>document.getElementById(id);
 const SKU_GAME='port-lucky',SKU_WALK='port-lucky-walkthrough';
 let account=null,ent={game:false,walk:false},catalog={};
 const escapeHtml=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function api(method,path,data){const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const out=await r.json();if(!r.ok)throw Object.assign(new Error(out.error || 'Request failed'),{status:r.status});return out;}
+async function api(method,path,data){const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const out=await r.json();if(!r.ok)throw Object.assign(new Error(out.error || 'Request failed'),{status:r.status});return out;}
 function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,ent])!==JSON.stringify([s.user,next]);account=s.user;ent=next;catalog=s.catalog;if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
 export const host=createPortLuckyHost({container:$('gameMount'),mount,signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}});
 function showCatalogue(){document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
-async function startGame(){try{await refreshMe();if(!account?.verified)return signIn();document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;await host.start();}catch(e){toast(e.message);await host.stop();showCatalogue();}}
-async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:me.catalog || c.catalog});}
+let starting=null;
+function startGame(expectedOwner){const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;starting=(async()=>{try{await refreshMe();if(guarded && (account?.id!==expectedOwner || !account?.verified || !ent.game))throw new Error('Account or game ownership changed. No automatic resume.');if(!account?.verified){await signIn();return false;}document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;await host.start(guarded?expectedOwner:undefined);return true;}catch(e){toast(e.message);await host.stop();showCatalogue();return false;}})().finally(()=>{starting=null;});return starting;}
+async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:me.catalog || c.catalog});return {user:me.user || null,entitlements:me.entitlements || []};}
 $('playHero').onclick=startGame;$('playCard').onclick=startGame;
 $('logoBtn').onclick=async()=>{await host.stop();showCatalogue();};
 $('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame();};
-drawLandingArt();refreshMe().catch(e=>toast(e.message));
+drawLandingArt();
 const query=new URLSearchParams(location.search);
-if(query.has('purchase') || query.has('signin')){history.replaceState(null,'',location.pathname);refreshMe().catch(()=>{});if(query.get('purchase')==='success')toast('Checking server ownership. A checkout return is not proof of payment.');if(query.get('signin')==='expired')signIn();}
+const purchaseResult=query.get('purchase'),purchaseSku=query.get('sku');
+function purchaseStatus({text,retry=false,play=false}){
+ let panel=$('purchaseReturn');if(!panel){panel=document.createElement('section');panel.id='purchaseReturn';panel.className='overlay-card';panel.setAttribute('aria-label','Purchase return');$('home').prepend(panel);}
+ panel.replaceChildren();const message=document.createElement('p');message.setAttribute('role','status');message.textContent=text;panel.append(message);
+ if(retry){const b=document.createElement('button');b.className='btn';b.textContent='Check ownership again';b.onclick=()=>purchaseReturn.run(purchaseResult,purchaseSku,{retry:true});panel.append(b);}
+ if(play){const b=document.createElement('button');b.className='btn ghost';b.textContent='Play / resume Port Lucky';b.onclick=()=>startGame();panel.append(b);}
+}
+export const purchaseReturn=createPurchaseReturn({read:refreshMe,resume:async s=>{if(!await startGame(s.user.id))throw new Error('Resume failed');},status:purchaseStatus});
+if(query.has('purchase') || query.has('signin'))history.replaceState(null,'',location.pathname);
+if(query.has('purchase')){purchaseReturn.run(purchaseResult,purchaseSku);if(purchaseResult!=='success' || ![SKU_GAME,SKU_WALK].includes(purchaseSku))refreshMe().catch(e=>toast(e.message));}
+else refreshMe().catch(e=>toast(e.message));
+if(query.get('signin')==='expired')signIn();
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 /* ---------- Modals: sign-up, checkout, confirm ---------- */
 function modal(html, onClose) {

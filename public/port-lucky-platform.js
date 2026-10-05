@@ -33,7 +33,7 @@ function validSave(data){
 }
 const changed = () => Object.assign(new Error('Player access changed; result discarded.'), {status:409, code:'STATE_CHANGED'});
 const fingerprint = s => JSON.stringify([s.user?.id || null, s.user?.verified ?? null, [...(s.entitlements || [])].sort()]);
-export function createPortLuckyAdapter({fetch:fetcher=(...args)=>globalThis.fetch(...args), signUp, signIn, onAccessChange, onConflict, onState}={}) {
+export function createPortLuckyAdapter({fetch:fetcher=(...args)=>globalThis.fetch(...args), signUp, signIn, onAccessChange, onConflict, onState, expectedOwner}={}) {
  let state=null, identity=null, epoch=0, sequence=0, disposed=false, revision=0, initialized=false, conflict=false, saveBlocked=false, queue=Promise.resolve();
  const listeners=new Set();
  const controllers=new Set();
@@ -57,6 +57,7 @@ export function createPortLuckyAdapter({fetch:fetcher=(...args)=>globalThis.fetc
   if(identity!==null && next!==identity) {
    invalidate(); onAccessChange?.(); throw changed();
   }
+  if(expectedOwner && (me.user?.id!==expectedOwner || !me.user?.verified || !(me.entitlements || []).includes('port-lucky')))throw changed();
   identity=next;
   const envelope=me.save_envelopes?.['port-lucky'];
   const owned=(me.entitlements || []).includes('port-lucky');
@@ -120,10 +121,10 @@ export function createPortLuckyHost({container,mount,signUp,signIn,onState,onExi
   for(const key of ['savedT','toastT','lblT'])clearTimeout(old?.engine?.[key]);
   bridge?.dispose();bridge=null;container.replaceChildren();
  }
- async function start(){
+ async function start(expectedOwner){
   await stop(); active=true; const t=++ticket;
-  const local=createPortLuckyAdapter({fetch,signUp,signIn,onState,onConflict,
-   onAccessChange:()=>{if(active && bridge===local)serial(start).catch(e=>onError?.(e));}});bridge=local;
+  const local=createPortLuckyAdapter({fetch,signUp,signIn,onState,onConflict,expectedOwner,
+   onAccessChange:()=>{if(active && bridge===local)serial(()=>start(expectedOwner)).catch(e=>onError?.(e));}});bridge=local;
   // The received module registers two anonymous document listeners in wire()
   // but unmount() cannot remove them. Capture only synchronous mount-time
   // registrations, restore the browser method immediately, and own their cleanup.
@@ -135,5 +136,5 @@ export function createPortLuckyHost({container,mount,signUp,signIn,onState,onExi
  }
  const timer=setInterval(()=>{if(active && handle)bridge.refresh().catch(e=>{if(e.code!=='STATE_CHANGED')onError?.(e);});},interval);
  const visible=()=>{if(!document.hidden && active)bridge?.refresh().catch(()=>{});};document.addEventListener('visibilitychange',visible);
- return {start:()=>serial(start),stop:()=>serial(()=>stop()),async refresh(){if(bridge)return bridge.refresh();},get handle(){return handle;},get adapter(){return bridge?.adapter;},async destroy(){clearInterval(timer);document.removeEventListener('visibilitychange',visible);await serial(()=>stop(true));}};
+ return {start:expectedOwner=>serial(()=>start(expectedOwner)),stop:()=>serial(()=>stop()),async refresh(){if(bridge)return bridge.refresh();},get handle(){return handle;},get adapter(){return bridge?.adapter;},async destroy(){clearInterval(timer);document.removeEventListener('visibilitychange',visible);await serial(()=>stop(true));}};
 }
