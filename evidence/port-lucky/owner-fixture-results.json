@@ -1,0 +1,47 @@
+[
+  {
+    "name": "free-player-paywall-and-denied-hints",
+    "status": "pass",
+    "ms": 9505,
+    "notes": [
+      "paywall shown, checkout refused by fixture, entitlements unchanged, paywall persists on reload"
+    ],
+    "errors": []
+  },
+  {
+    "name": "old-save-migration",
+    "status": "pass",
+    "ms": 8978,
+    "notes": [
+      "v1 saves (mid-demo and demo-complete) migrate to v2 and continue"
+    ],
+    "errors": []
+  },
+  {
+    "name": "save-failure-visible",
+    "status": "pass",
+    "ms": 2914,
+    "notes": [
+      "failed save shows \"Save failed\" + Retry; retry succeeds and persists"
+    ],
+    "errors": []
+  },
+  {
+    "name": "mobile-layouts",
+    "status": "pass",
+    "ms": 4654,
+    "notes": [
+      "portrait rotate prompt, landscape side actions, Type + Items sheets, tap-to-use on canvas"
+    ],
+    "errors": []
+  },
+  {
+    "name": "mount-unmount-and-clicks",
+    "status": "pass",
+    "ms": 4482,
+    "notes": [
+      "verb clicks, item-on-hotspot clicks, unmount/remount"
+    ],
+    "errors": []
+  }
+]

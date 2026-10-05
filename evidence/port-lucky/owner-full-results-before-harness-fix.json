@@ -1,0 +1,96 @@
+[
+  {
+    "name": "full-run-dolphin",
+    "status": "PASS",
+    "notes": [
+      "250/250 dolphin; real D1 revision 57; 57 acknowledged saves"
+    ],
+    "ms": 239446
+  },
+  {
+    "name": "full-run-cash-with-hints",
+    "status": "PASS",
+    "notes": [
+      "250/250 cash; three real ordered hints; 10s gate exercised; revision 60"
+    ],
+    "ms": 250298
+  },
+  {
+    "name": "free-paywall-and-hint-api",
+    "status": "PASS",
+    "notes": [
+      "real 402; disabled checkout 503; 25-point paywall persisted"
+    ],
+    "ms": 10204
+  },
+  {
+    "name": "server-hint-order-privacy-owner-guard",
+    "status": "PASS",
+    "notes": [
+      "402/409 and all three hint levels; four server-only/dev paths 404; mismatched save 409 unchanged"
+    ],
+    "ms": 103
+  },
+  {
+    "name": "save-failure-retry-cas-recovery",
+    "status": "PASS",
+    "notes": [
+      "network failure visible; Retry persisted; stale CAS 409 retained snapshot; explicit discard/load"
+    ],
+    "ms": 6692
+  },
+  {
+    "name": "old-save-migration",
+    "status": "PASS",
+    "notes": [
+      "two v1 saves migrated through real D1; continued to chapter 3"
+    ],
+    "ms": 10374
+  },
+  {
+    "name": "account-switch-revoke-stale-responses",
+    "status": "PASS",
+    "notes": [
+      "real session switches; rendered hint removed on revoke; paid chapter gated on revoke; save isolation"
+    ],
+    "ms": 18895
+  },
+  {
+    "name": "delayed-real-api-responses-account-switch",
+    "status": "PASS",
+    "notes": [
+      "held genuine Worker hint/save responses; switched real session; old engine destroyed; old hint and save acknowledgement discarded"
+    ],
+    "ms": 6133
+  },
+  {
+    "name": "mobile-touch-parser-items-rotate-exit",
+    "status": "PASS",
+    "notes": [
+      "390x844,844x390,320x700; actual touchscreen taps; Items/use; keyboard parser; rotate; exit"
+    ],
+    "ms": 6279
+  },
+  {
+    "name": "mount-unmount-keepalive-auth-close",
+    "status": "FAIL",
+    "notes": [],
+    "error": "page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('#playCard')\n    - locator resolved to <button id=\"playCard\" class=\"btn small\">Play</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n      - waiting 100ms\n    58 × waiting for element to be visible, enabled and stable\n       - element is not visible\n     - retrying click action\n       - waiting 500ms\n\n    at Session.play (/opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/harness.js:26:19)\n    at async file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:80:576\n    at async withSession (/opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:6:135)\n    at async scenario (/opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:5:145)\n    at async file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:77:1",
+    "ms": 34345
+  },
+  {
+    "name": "invalid-save-and-mount-failure-cleanup",
+    "status": "FAIL",
+    "notes": [],
+    "error": "page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('#playCard')\n    - locator resolved to <button id=\"playCard\" class=\"btn small\">Play</button>\n  - attempting click action\n    2 × waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n    - waiting 20ms\n    2 × waiting for element to be visible, enabled and stable\n      - element is not visible\n    - retrying click action\n      - waiting 100ms\n    58 × waiting for element to be visible, enabled and stable\n       - element is not visible\n     - retrying click action\n       - waiting 500ms\n\n    at Session.play (/opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/harness.js:26:19)\n    at async file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:90:89\n    at async withSession (/opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:6:135)\n    at async scenario (/opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:5:145)\n    at async file:///opt/hermes-data/workspaces/Strategico-Workspace/apps/retroquests-port-lucky-integration-v1/tests/port-lucky/run.js:83:1",
+    "ms": 34466
+  },
+  {
+    "name": "deaths-retry-restart",
+    "status": "PASS",
+    "notes": [
+      "deaths verified: cocktail, karaoke-no-token, duane-trophy, alley-bottle, gulls, hammer-on-glass, call-mom, breakwater, diesel, dinghy-no-rope, winch, hip-flask, bridal-tent, clock"
+    ],
+    "ms": 338177
+  }
+]

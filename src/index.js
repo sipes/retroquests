@@ -281,6 +281,7 @@ async function putSave(req, env) {
   if (new TextEncoder().encode(raw).byteLength > MAX_SAVE_BYTES) throw new HttpError(413, 'Save file is too large.');
   let b; try { b = JSON.parse(raw); } catch { throw new HttpError(400, 'Send the save as JSON.'); }
   if(!b || b.version !== 1 || !Number.isSafeInteger(b.revision) || b.revision < 0 || !b.data || typeof b.data !== 'object' || Array.isArray(b.data)) throw new HttpError(400,'Save version 1, object data and a CAS revision are required.');
+  if ((b.ownerId !== undefined && b.ownerId !== u.id) || (b.data.ownerId !== undefined && b.data.ownerId !== u.id)) throw new HttpError(409, 'Save owner does not match the signed-in user.');
   const gameId = String(b.game_id || '');
   if (!GAMES[gameId]) throw new HttpError(400, 'Unknown game.');
   await limit(env,'save',u.id,120,60);

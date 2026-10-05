@@ -1,0 +1,130 @@
+import fs from 'node:fs';import path from 'node:path';
+import {Session,launch,assert,EVIDENCE,api,reset,seedSave,sql,ids} from './harness.js';
+import * as W from '../../dev/test/walkthrough.js';
+const only=process.argv.slice(2),results=[],browser=await launch();
+async function scenario(name,fn){if(only.length&&!only.includes(name))return;const t=Date.now(),entry={name,status:'PASS',notes:[]};let s;try{s=await fn(entry);if(s)assert(s.errors.length===0,'page errors '+s.errors);}catch(e){entry.status='FAIL';entry.error=e.stack;console.error(e.stack);}finally{entry.ms=Date.now()-t;results.push(entry);console.log(entry.status,name,entry.ms+'ms',entry.notes.join('; '));}}
+async function withSession(kind,name,fn,opts={}){await reset(kind);const s=await Session.open(browser,{player:kind,name,...opts});try{await fn(s);assert(s.errors.length===0,'no page errors: '+s.errors.join('|'));}catch(e){await s.shot('FAIL');throw e;}finally{await s.close();}}
+await scenario('full-run-dolphin',entry=>withSession('owner','real-full-dolphin',async s=>{
+ await W.chapter1(s);await W.chapter2(s);await W.chapter3(s);await W.chapter4(s,'dolphin');await W.chapter5(s);await W.chapter6(s);await W.chapter7(s);const st=await W.chapter8(s,'dolphin');
+ await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));const saved=(await api('owner','/api/me')).data.save_envelopes['port-lucky'];assert(saved.data.done&&saved.data.score===250,'real D1 final 250/250');entry.notes.push('250/250 dolphin; real D1 revision '+saved.revision+'; '+s.network.filter(x=>x.method==='PUT'&&x.status===200).length+' acknowledged saves');
+ await s.reload();assert((await s.state()).score===250,'reload restored final score');await s.shot('final-reloaded');
+}));
+await scenario('full-run-cash-with-hints',entry=>withSession('walkthrough','real-full-cash',async s=>{
+ await W.chapter1(s);await W.chapter2(s);await W.chapter3(s);await s.cmd('look');await s.page.click('.pl-game [data-id="stucktab"]');
+ assert(await s.page.$('.lvl[data-puzzle="sal-standoff"][data-level="2"][disabled]'),'hint order in UI');
+ for(const level of [0,1]){await s.page.click(`.lvl[data-puzzle="sal-standoff"][data-level="${level}"]`);await s.page.click('.pl-game .modal-veil [data-a="yes"]');await s.page.waitForFunction(n=>document.querySelectorAll('.pl-game .hint-text').length>=n,level+1);}
+ const text=await s.page.locator('.hint-text').first().textContent();assert(/Sal only wants two things/.test(text),'server supplied hint text');
+ await s.page.click('.lvl[data-puzzle="sal-standoff"][data-level="2"]');assert(await s.page.locator('.pl-game [data-a="yes"]').isDisabled(),'10-second solution gate');await s.page.waitForTimeout(10500);await s.page.click('.pl-game [data-a="yes"]');await s.page.waitForFunction(()=>document.querySelectorAll('.hint-text').length===3);await s.shot('server-hints');await s.page.click('.pl-game .drawer .btn:has-text("Close")');
+ await W.chapter4(s,'cash');await W.chapter5(s);await W.chapter6(s);await W.chapter7(s);const st=await W.chapter8(s,'cash');await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));
+ const saved=(await api('walkthrough','/api/me')).data.save_envelopes['port-lucky'];assert(saved.data.score===250&&saved.data.done,'cash final persisted');const hints=await api('walkthrough','/api/hints?game=port-lucky');assert(hints.data.count===3,'three server hint records');entry.notes.push('250/250 cash; three real ordered hints; 10s gate exercised; revision '+saved.revision);
+}));
+await scenario('free-paywall-and-hint-api',entry=>withSession('free','real-free',async s=>{
+ await s.page.click('.pl-game [data-id="stucktab"]');const locked=await s.page.locator('.pl-game .locked').textContent();assert(locked.includes('$7.99')&&locked.includes('$1.99'),'catalog-controlled prices');await s.shot('hints-locked');await s.page.click('.drawer .btn:has-text("Close")');
+ assert((await api('free','/api/hint',{method:'POST',data:{game_id:'port-lucky',puzzle_id:'goat',level:0}})).status===402,'real 402');
+ await W.chapter1(s);await s.dismiss();await s.page.waitForSelector('.overlay-card .price-big');assert(await s.page.locator('.overlay-card .price-big').textContent()==='$7.99','paywall price');await s.shot('paywall');
+ await s.page.click('.overlay-card [data-a="buy"]');await s.page.waitForFunction(()=>/Sales are disabled/.test(document.querySelector('.pl-game [data-id="coErr"]')?.textContent || ''));await s.shot('sales-disabled');await s.page.click('.pl-game .modal-veil [data-a="cancel"]');
+ await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));await s.reload();await s.page.waitForSelector('.overlay-card .price-big');assert((await api('free','/api/me')).data.entitlements.length===0,'checkout never grants ownership');entry.notes.push('real 402; disabled checkout 503; 25-point paywall persisted');
+}));
+await scenario('server-hint-order-privacy-owner-guard',async entry=>{
+ assert((await api('walkthrough','/api/hint',{method:'POST',data:{game_id:'port-lucky',puzzle_id:'goat',level:2}})).status===409,'real hint order 409');
+ for(const level of [0,1,2])assert((await api('walkthrough','/api/hint',{method:'POST',data:{game_id:'port-lucky',puzzle_id:'goat',level}})).status===200,'hint '+level);
+ const prev=await api('free','/api/me');const wrong=await api('free','/api/save',{method:'PUT',data:{game_id:'port-lucky',version:1,revision:prev.data.save_envelopes?.['port-lucky']?.revision || 0,ownerId:ids.owner,data:{flags:{},ownerId:ids.owner}}});assert(wrong.status===409,'server mismatched owner guard');assert(JSON.stringify((await api('free','/api/me')).data.save_envelopes)===JSON.stringify(prev.data.save_envelopes),'owner denial leaves D1 unchanged');
+ for(const target of ['/src/games/port-lucky-hints.js','/games/port-lucky/port-lucky-hints.js','/dev/port-lucky/','/dev/test/run.js']){const r=await fetch(new URL(target,process.env.PL_BASE));assert(r.status===404,'private path not shipped '+target);}
+ const c=(await api('free','/api/config')).data;assert(c.saleEnabled===false&&c.catalog['port-lucky'].price_cents===799&&c.catalog['port-lucky-walkthrough'].price_cents===199,'prices and gates');entry.notes.push('402/409 and all three hint levels; four server-only/dev paths 404; mismatched save 409 unchanged');
+});
+await scenario('save-failure-retry-cas-recovery',entry=>withSession('owner','real-savefail',async s=>{
+ await s.dismiss();await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));
+ await s.page.route('**/api/save',r=>r.abort('failed'));await s.cmd('look at me');await s.page.waitForSelector('.savestate.failed');await s.shot('network-save-failure');await s.page.unroute('**/api/save');await s.page.click('.pl-game [data-id="retrysave"]');await s.page.waitForSelector('.savestate.saved');assert((await api('owner','/api/me')).data.save_envelopes['port-lucky'].data.score===1,'retry really persisted');
+ const me=(await api('owner','/api/me')).data,env=me.save_envelopes['port-lucky'];const remote={...env.data,score:99};assert((await seedSave('owner',remote)).status===200,'other device CAS write');
+ await s.cmd('open minibar');await s.page.waitForSelector('.savestate.failed');await s.page.waitForSelector('#saveRecovery:not([hidden])');await s.shot('cas-conflict');await s.page.click('.pl-game [data-id="retrysave"]');await s.page.waitForTimeout(500);assert((await api('owner','/api/me')).data.save_envelopes['port-lucky'].data.score===99,'no blind revision adoption');assert((await s.state()).score===3,'pending snapshot retained');
+ s.page.once('dialog',d=>d.accept());await s.page.click('#reloadSave');await s.page.waitForTimeout(600);assert((await s.state()).score===99,'explicit load server recovery');entry.notes.push('network failure visible; Retry persisted; stale CAS 409 retained snapshot; explicit discard/load');
+}));
+await scenario('old-save-migration',entry=>withSession('owner','real-oldsave',async s=>{
+ const v1={room:'garage',inv:['keycard','ticket'],flags:{minibarOpen:true,gotCrackers:true,goatFed:true,gotTicket:true,leftSuite:true,calledDesk:true},scored:{feed:true,arm:true,minibar:true,crackers:true,ticket:true,tuba:true,desk:true,door:true},score:25,hintsUsed:0,revealed:{},px:290,py:168,dir:-1,started:true};
+ await s.page.evaluate(async()=>{const {host}=await import('/portal.js');await host.stop();});await seedSave('owner',v1);await s.reload();await s.dismiss();let st=await s.state();assert(st.v===2&&st.chapter===2&&st.score===25&&st.checkpoint.chapter===2,'mid-demo migration and checkpoint');await s.shot('mid-demo-migrated');await W.chapter2(s);await s.waitRoom('bar');
+ await s.page.evaluate(async()=>{const {host}=await import('/portal.js');await host.stop();});await seedSave('owner',{...v1,flags:{...v1.flags,truckOpen:true,gotKeys:true,gotShoe:true,gotReceipt:true,demoDone:true},inv:['keycard','keys','shoe','receipt'],score:50});await s.reload();await s.dismiss();st=await s.state();assert(st.chapter===2&&!st.flags.demoDone,'demoDone migration');await s.cmd('use ramp');await s.waitRoom('bar');entry.notes.push('two v1 saves migrated through real D1; continued to chapter 3');
+}));
+await scenario('account-switch-revoke-stale-responses',entry=>withSession('walkthrough','real-identity',async s=>{
+ await reset('other');await W.chapter1(s);await s.waitRoom('garage');await s.dismiss();await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));
+ await s.page.click('.pl-game [data-id="stucktab"]');await s.page.click('.lvl[data-puzzle="valet"][data-level="0"]');await s.page.click('.pl-game [data-a="yes"]');await s.page.waitForSelector('.hint-text');await s.shot('owned-hint');
+ // Change the actual local D1 entitlement while hint text is on screen.
+ sql(`INSERT INTO access_revocations VALUES('${ids.walkthrough}','port-lucky-walkthrough',1);UPDATE entitlement_contributions SET revoked_at=1 WHERE user_id='${ids.walkthrough}' AND sku='port-lucky-walkthrough';`);
+ await s.page.evaluate(async()=>{try{await (await import('/portal.js')).host.refresh();}catch{}});await s.page.waitForTimeout(600);assert(!(await s.page.$('.hint-text')),'revocation removes rendered hint');
+ await s.page.click('.pl-game [data-id="stucktab"]');assert(await s.page.$('.locked'),'revoked hint drawer upsell');await s.shot('hint-revoked');await s.page.click('.drawer .btn:has-text("Close")');
+ sql(`INSERT INTO access_revocations VALUES('${ids.walkthrough}','port-lucky',1);UPDATE entitlement_contributions SET revoked_at=1 WHERE user_id='${ids.walkthrough}' AND sku='port-lucky';`);
+ await s.page.evaluate(async()=>{try{await (await import('/portal.js')).host.refresh();}catch{}});await s.page.waitForSelector('.overlay-card .price-big');await s.shot('paid-access-revoked');
+ await s.setPlayer('other');await s.dismiss();assert((await s.state()).score===0&&(await s.state()).chapter===1,'other account starts isolated');await s.cmd('look at me');await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));await s.setPlayer('walkthrough');await s.page.waitForSelector('.overlay-card .price-big');assert((await s.state()).score===25,'original progress intact');
+ await s.setPlayer('anon');await s.page.waitForTimeout(500);assert(await s.page.$('.pl-gate'),'signed out gate remounted without progress');assert((await api('other','/api/me')).data.save_envelopes['port-lucky'].data.score===1,'other isolated score');
+ sql(`DELETE FROM access_revocations WHERE user_id='${ids.walkthrough}';UPDATE entitlement_contributions SET revoked_at=NULL WHERE user_id='${ids.walkthrough}';`);entry.notes.push('real session switches; rendered hint removed on revoke; paid chapter gated on revoke; save isolation');
+}));
+await scenario('delayed-real-api-responses-account-switch',entry=>withSession('walkthrough','real-stale-api',async s=>{
+ await reset('other');await s.dismiss();await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));
+ let release,arrived;const ready=new Promise(r=>arrived=r),held=new Promise(r=>release=r);
+ await s.page.route('**/api/hint',async route=>{const response=await route.fetch();assert(response.status()===200,'delayed real authorized hint');arrived();await held;try{await route.fulfill({response});}catch{}});
+ await s.page.click('.pl-game [data-id="stucktab"]');await s.page.click('.lvl[data-puzzle="goat"][data-level="0"]');await s.page.click('.pl-game [data-a="yes"]');await ready;
+ await s.setPlayer('other');release();await s.page.unroute('**/api/hint');await s.dismiss();assert(!(await s.page.$('.hint-text')),'delayed old private hint discarded');assert((await s.state()).score===0,'new account game isolated');
+ await s.setPlayer('walkthrough');await s.dismiss();await s.page.evaluate(()=>{window.__old=window.__plGame.engine;});
+ let releaseSave,saveArrived;const saveReady=new Promise(r=>saveArrived=r),saveHeld=new Promise(r=>releaseSave=r);
+ await s.page.route('**/api/save',async route=>{const response=await route.fetch();assert(response.status()===200,'delayed real save acknowledged by D1');saveArrived();await saveHeld;try{await route.fulfill({response});}catch{}});
+ const flushing=s.page.evaluate(()=>window.__plGame.engine.flushSave(false));await saveReady;await s.setPlayer('other');releaseSave();await flushing;await s.page.unroute('**/api/save');
+ assert(await s.page.evaluate(()=>window.__old.destroyed&&window.__old.saveState!=='saved'),'stale save acknowledgement not credited');assert(!(await api('other','/api/me')).data.save_envelopes?.['port-lucky']?.data?.ownerId || (await api('other','/api/me')).data.save_envelopes['port-lucky'].data.ownerId===ids.other,'old snapshot never reaches new account');await s.shot('stale-responses-discarded');entry.notes.push('held genuine Worker hint/save responses; switched real session; old engine destroyed; old hint and save acknowledgement discarded');
+}));
+await scenario('mobile-touch-parser-items-rotate-exit',entry=>withSession('owner','real-mobile',async s=>{
+ s.touch=true;assert(await s.page.locator('.rotate-hint').isVisible(),'portrait rotate visible');await s.shot('390x844-rotate');await s.page.tap('.pl-game [data-id="rotAnyway"]');await s.dismiss();assert(!(await s.page.locator('.rotate-hint').isVisible()),'upright works');assert(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'portrait no overflow');await s.shot('390x844-upright');
+ await s.page.setViewportSize({width:844,height:390});await s.page.waitForTimeout(250);await s.page.tap('.pl-game [data-id="sideType"]');await s.cmd('open minibar');await s.cmd('take crackers');await s.dismiss();await s.page.tap('.pl-game [data-id="sideItems"]');await s.page.waitForSelector('.inv-sheet');await s.shot('844x390-items');await s.page.tap('.inv-card .btn');await s.clickCanvas(160,70);await s.dismiss();assert((await s.state()).flags.goatFed,'real touch item use on goat');assert(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'landscape no overflow');await s.shot('844x390-fed');
+ await s.page.tap('.pl-game [data-id="sideExit"]');await s.page.waitForSelector('#home:not([hidden])');assert(!(await s.page.$('.pl-game')),'exit tears down game');await s.page.setViewportSize({width:320,height:700});await s.play();await s.page.tap('.pl-game [data-id="rotAnyway"]');assert(await s.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'narrow no overflow');await s.shot('320x700');entry.notes.push('390x844,844x390,320x700; actual touchscreen taps; Items/use; keyboard parser; rotate; exit');
+},{viewport:{width:390,height:844},touch:true}));
+await scenario('mount-unmount-keepalive-auth-close',entry=>withSession('owner','real-lifecycle',async s=>{
+ await s.dismiss();await s.clickVerb('Use');await s.clickCanvas(236,95);await s.dismiss();await s.clickVerb('Take');await s.clickCanvas(228,90);await s.dismiss();await s.clickItem('crackers');await s.clickCanvas(160,70);await s.dismiss();assert((await s.state()).flags.goatFed,'point-and-click puzzle');
+ await s.page.evaluate(async()=>{const {host}=await import('/portal.js');window.__oldEngine=host.handle.engine;window.__keepalive=[];const original=window.fetch;window.fetch=(u,o)=>{if(u==='/api/save')window.__keepalive.push(o.keepalive);return original(u,o);};await host.stop();});
+ assert(!(await s.page.$('.pl-game')),'unmount removed DOM');assert(await s.page.evaluate(()=>window.__oldEngine.destroyed),'engine stopped');assert(await s.page.evaluate(()=>!window.__listeners['document:fullscreenchange']?.size&&!window.__listeners['document:keydown']?.size&&!window.__listeners['window:pagehide']?.size),'document/window game listeners cleaned');assert((await api('owner','/api/me')).data.save_envelopes['port-lucky'].data.flags.goatFed,'unmount flush real D1');assert((await s.page.evaluate(()=>window.__keepalive)).includes(true),'keepalive forwarded');await s.play();await s.dismiss();assert((await s.state()).flags.goatFed,'remount restored progress');
+ await s.setPlayer('anon');await s.page.evaluate(()=>{window.__authDone=false;window.__plAdapter.signIn().then(()=>window.__authDone=true).catch(()=>{});});await s.page.waitForSelector('#siForm');assert(!(await s.page.evaluate(()=>window.__authDone)),'auth promise pending');await s.page.click('#siNew');await s.page.waitForSelector('#suForm');assert(!(await s.page.evaluate(()=>window.__authDone)),'auth promise pending across form switch');await s.page.keyboard.press('Escape');await s.page.waitForFunction(()=>window.__authDone);entry.notes.push('clicks; unmount flush keepalive and acknowledged D1; clean remount; auth closes after UI completion including form switch');
+}));
+await scenario('invalid-save-and-mount-failure-cleanup',entry=>withSession('owner','real-failure-cleanup',async s=>{
+ await s.page.evaluate(async()=>{await (await import('/portal.js')).host.stop();});
+ await seedSave('owner',{});const before=(await api('owner','/api/me')).data.save_envelopes['port-lucky'];await s.reload();
+ assert(await s.page.$('.pl-gate'),'invalid save gates rather than auto-reset');await s.page.waitForTimeout(500);
+ assert(JSON.stringify((await api('owner','/api/me')).data.save_envelopes['port-lucky'])===JSON.stringify(before),'invalid D1 save untouched');
+ await s.page.evaluate(async()=>{await (await import('/portal.js')).host.stop();});await reset('owner');
+ const cleaned=await s.page.evaluate(async()=>{const {Engine}=await import('/games/port-lucky/engine.js'),{host}=await import('/portal.js');const original=Engine.prototype.start;let engine;Engine.prototype.start=function(){engine=this;throw new Error('Injected initialization failure');};try{await host.start();return false;}catch{await new Promise(r=>setTimeout(r,100));return engine.destroyed&&!document.querySelector('.pl-game')&&!window.__listeners['document:fullscreenchange']?.size&&!window.__listeners['document:keydown']?.size&&!window.__listeners['window:pagehide']?.size;}finally{Engine.prototype.start=original;}});
+ assert(cleaned,'failed supplied mount engine and document/pagehide resources cleaned');await s.play();await s.dismiss();await s.shot('clean-recovered-mount');entry.notes.push('malformed real D1 save retained; injected late initialization failure cleaned; subsequent mount works');
+}));
+await scenario('deaths-retry-restart', async entry => {
+  await reset('owner'); const s = await Session.open(browser, { player: 'owner', name: 'real-deaths' });
+  const deaths = [];
+  const die = async (label, cmd, pre) => { await s.cmd(cmd); const t = await s.expectDeath(label); deaths.push(label); await s.tryAgain(); const st = await s.state(); assert(JSON.stringify([st.score, st.inv, st.room]) === JSON.stringify([pre.score, pre.inv, pre.room]), `retry restores state for ${label}`); return t; };
+  try {
+    let pre = await s.state(); await die('cocktail', 'drink cocktail', pre);
+    await W.chapter1(s); await W.chapter2(s); await s.waitRoom('bar'); await s.dismiss();
+    pre = await s.state(); await die('karaoke-no-token', 'use microphone', pre);
+    pre = await s.state(); await die('duane-trophy', 'take trophy', pre);
+    await s.cmd('use alley door'); await s.waitRoom('alley'); pre = await s.state(); await die('alley-bottle', 'drink bottle', pre);
+    // Restart scene mid-chapter 3 returns to the chapter checkpoint
+    await s.cmd('use bar door'); await s.waitRoom('bar'); await s.cmd('search jukebox'); assert((await s.state()).inv.includes('token'), 'token taken');
+    await s.restartScene(); await s.dismiss(); const cp = await s.state(); assert(cp.room === 'bar' && !cp.inv.includes('token') && cp.score === 50, 'restart returns to chapter start');
+    await W.chapter3(s); await s.waitRoom('pier'); await s.dismiss();
+    await s.cmd('talk to nadia'); await s.cmd('take churro'); pre = await s.state(); await die('gulls', 'eat churro', pre);
+    await s.cmd('use arcade'); await s.waitRoom('arcade'); pre = await s.state(); await die('hammer-on-glass', 'hit claw', pre);
+    await s.cmd('use change machine'); await s.cmd('use quarters on claw'); await s.cmd('look at hammer'); await s.cmd('use hammer'); await s.cmd('use hammer'); await s.cmd('use hammer'); await s.cmd('take wallet'); await s.cmd('use door'); await s.waitRoom('pier');
+    await s.cmd('talk to sal'); await s.cmd('give keys to sal'); await s.cmd('give dolphin to nadia'); pre = await s.state(); await s.cmd('use phone'); await s.choose(/Mom/); await s.expectDeath('call-mom'); deaths.push('call-mom'); await s.tryAgain(); assert((await s.state()).flags.calledKevin === undefined, 'retry after Mom restores');
+    await s.cmd('use quarters on zora'); await s.cmd('use phone'); await s.choose(/Kevin/); await s.cmd('use marina'); await s.waitRoom('dock'); await s.dismiss();
+    pre = await s.state(); await die('breakwater', 'use breakwater', pre);
+    pre = await s.state(); await die('diesel', 'drink from pump', pre);
+    await s.cmd('use quarters on telescope'); await s.cmd('talk to oscar'); await s.cmd('give churro to oscar'); await s.cmd('use oars on dinghy'); pre = await s.state(); await die('dinghy-no-rope', 'use dinghy', pre);
+    await s.cmd('take rope'); await s.cmd('use rope on dinghy'); await s.cmd('use rope on cleat'); await s.cmd('use dinghy'); await s.waitRoom('pontoon'); pre = await s.state(); await die('winch', 'use winch', pre);
+    await s.cmd('take shoe'); await s.cmd('take cooler'); await s.cmd('use cooler on benny'); await s.cmd('give right shoe to benny'); await s.cmd('use phone'); await s.waitRoom('corridor'); await s.dismiss();
+    await W.chapter6(s); await s.waitRoom('lawn'); await s.dismiss();
+    await s.cmd('use grooms tent'); await s.waitRoom('groomtent'); pre = await s.state(); await die('hip-flask', 'drink flask', pre);
+    await s.cmd('take bag'); await s.cmd('take water'); await s.cmd('take polish'); await s.cmd('take bow tie'); await s.cmd('give water to benny'); await s.cmd('use tuxedo on benny'); await s.cmd('use polish on shoe'); await s.cmd('give shoe to benny'); await s.cmd('use flap'); await s.waitRoom('lawn');
+    pre = await s.state(); await die('bridal-tent', 'use bridal tent', pre);
+    // Clock expiry: wait for the real clock to run out (12 game-minutes = 4 real minutes), then retry gets 2 game-minutes back.
+    for (let i = 0; i < 320 && !(await s.page.$('.pl-game .sierra.death')); i++) { await s.dismiss(); await s.page.waitForTimeout(1000); } // arrival messages pause the clock; a player would dismiss them
+    await s.expectDeath('clock'); deaths.push('clock'); await s.tryAgain(); const st = await s.state(); assert(st.clock >= 100 && st.clock <= 120, 'retry after clock death restores 2 minutes: ' + st.clock);
+    await s.restartScene(); await s.dismiss(); const r = await s.state(); assert(r.clock > 700 && r.inv.includes('ring') && r.score === 185, 'restart ch7 resets clock and inventory: ' + JSON.stringify([r.clock, r.score, r.inv]));
+    entry.notes.push('deaths verified: ' + deaths.join(', '));
+    assert(s.errors.length === 0, 'no page errors: ' + s.errors.join(' | '));
+  } finally {await s.close();}
+});
+
+
+await browser.close();fs.writeFileSync(path.join(EVIDENCE,'results.json'),JSON.stringify(results,null,2));const pass=results.filter(x=>x.status==='PASS').length;fs.writeFileSync(path.join(EVIDENCE,'results.md'),`# Real integrated Worker/D1/browser results\n\n${pass}/${results.length} PASS\n\n`+results.map(x=>`- ${x.status} ${x.name}: ${x.notes.join('; ')}${x.error?'\n'+x.error:''}`).join('\n'));console.log(`${pass}/${results.length} PASS`);process.exit(pass===results.length?0:1);

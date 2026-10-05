@@ -1,0 +1,55 @@
+✔ exact seven methods and response shapes; failure/conflict rejects (35.564961ms)
+✔ identity or access change invalidates in-flight hint/save response (1.292622ms)
+✔ host destroys before remount; teardown interval and instance (0.67506ms)
+✔ explicit suite/garage compatibility does not rewrite game mechanics (0.476839ms)
+✔ out-of-order /me cannot restore stale player or paid access (26.69399ms)
+✔ different simultaneous completion events claim a single receipt; provider failure visible for reconciliation (50.90237ms)
+✔ controlled mocked mailbox proof precedes admin and concurrent token consumes once (76.617286ms)
+Unhandled platform error
+✔ login transaction failure rolls back token, identity and session (4.663919ms)
+✔ email missing config no logs/tokens; provider failure honest and redacted (6.859135ms)
+✔ durable auth limits and anti-enumeration; protection fails closed (9.007963ms)
+✔ baseline populated migration preserves financial rows, legacy saves and grants (4.180939ms)
+Unhandled platform error
+✔ deletion rollback preserves all personal and financial records (4.191322ms)
+✔ signed duplicate completion effects atomically once; invalid signatures/amounts rejected (11.998342ms)
+✔ refund before completion creates terminal tombstone; no late revival (5.270739ms)
+✔ full refund removes only purchase contribution; admin and other purchase survive (8.970131ms)
+✔ admin revocation survives late completion and walkthrough dependency enforced (10.969567ms)
+✔ partial refund/dispute visibly reconcile without invented automatic policy (7.862114ms)
+Unhandled platform error
+✔ event effect failure rolls claim back for retry (4.81166ms)
+✔ CAS simultaneous devices one winner, stale rejected, accounts isolated, reset avoids ABA (6.747013ms)
+✔ save JSON version, malformed and UTF-8 bounds; header and disabled sales (4.987376ms)
+✔ admin audit minimal identifiers, reset and signout are effective (6.080001ms)
+✔ checkout provider request pins USD base amount without promotions or automatic tax (0.766154ms)
+✔ landing identifies the arcade before the original featured adventure (1.302631ms)
+✔ landing has honest demo, development and planned SKU-specific pricing (0.415687ms)
+✔ supplied game replaces legacy handlers while landing artwork remains exact (0.441356ms)
+✔ actual worker config keeps full-game and optional-hint prices distinct and sales disabled (50.712716ms)
+✔ original licensed fonts are local and contain the five required faces (0.856754ms)
+✔ signed completions validate currency user SKU purchase; delayed payment grants only after paid (71.61723ms)
+✔ admin target detail never labels unverified allowlisted identity privileged (49.660511ms)
+✔ game bridge unwraps raw save and serializes current PUT CAS with actual ack and keepalive (31.36305ms)
+✔ malformed existing saves latch automatic writes off without adopting a revision (3.254394ms)
+✔ pagehide keepalive dispatches immediately behind a held ordinary write with strict CAS (9.854108ms)
+✔ bridge rejects unacknowledged writes without advancing CAS revision (2.280629ms)
+✔ bridge retains CAS conflict across state polling; owner mismatch rejected before write (1.604677ms)
+✔ bridge stale hint response discarded on actual observed identity/access change (3.062802ms)
+✔ bridge does not expose a hint revoked between hint request and acknowledgement (1.109768ms)
+✔ bridge out-of-order state cannot restore stale entitlement or save owner (0.750844ms)
+✔ server owner guard rejects both outer ownerId and raw game ownerId; no D1 mutation (10.121672ms)
+✔ all 28 authoritative puzzles stay server-only and cover drawing source is byte exact (7.482526ms)
+✔ host serializes rapid start/stop and removes old engine before remount (10.420006ms)
+✔ unverified admin is not privileged (43.28698ms)
+✔ signup requires mailbox proof; no cookie or token hook (8.39113ms)
+✔ purchaser deletion retains detached accounting with FK on (5.068545ms)
+✔ save write requires a version and CAS revision (4.73419ms)
+ℹ tests 44
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 268.462577

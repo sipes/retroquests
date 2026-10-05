@@ -1,0 +1,63 @@
+{
+  "zip_sha256": "e753c3ed757581b7dd34679523bbf9e1d601686c0f8a658ba4e864edab517f7e",
+  "zip_integrity": "PASS",
+  "safe_paths_symlinks": "PASS",
+  "game_files_equal": 8,
+  "server_hint_files_equal": 1,
+  "files": [
+    {
+      "path": "public/games/port-lucky/art.js",
+      "bytes": 41025,
+      "sha256": "ca16e81fc37fb9ac8524ebe9ee9155e75c5d6aa490f5e28c8e7a468fb6b1efea",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/data.js",
+      "bytes": 12918,
+      "sha256": "ff7604ba3b65e29fefba3bc31c407c1330b709a816f436948e9dd83d5824f185",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/engine.js",
+      "bytes": 43000,
+      "sha256": "8ca90e425dce01816068470206fa00c66243274a3c3ca7735cf73ac22c40c1c1",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/game.css",
+      "bytes": 16428,
+      "sha256": "8376c5077982f751d1efc002960cae0db50fe9aeba5ede1fe4ddad2efe5d6564",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/game.js",
+      "bytes": 2333,
+      "sha256": "70c0f07235eea7e8a80307bf95755528f73899f7447b978624f7a5fe38a0a2e5",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/rooms.js",
+      "bytes": 26419,
+      "sha256": "671cd399edef78354c6bb29c0296322fc86d56cf676ee3b7579f5a47bbfc1965",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/script.js",
+      "bytes": 103033,
+      "sha256": "6423aee02fd7a1e598fddd7a3361e5b8e7bd92654fdbbd77a969089aa94c6a1b",
+      "byte_equal": true
+    },
+    {
+      "path": "public/games/port-lucky/template.js",
+      "bytes": 3503,
+      "sha256": "2ee30a45b84b52c718799687b889154d469c183b0efdc6096524e3ccaf5635f7",
+      "byte_equal": true
+    },
+    {
+      "path": "src/games/port-lucky-hints.js",
+      "bytes": 10267,
+      "sha256": "226112bad5704b8dacfcc1400acc427700e212026e064ecaf7c5713267d0b716",
+      "byte_equal": true
+    }
+  ]
+}

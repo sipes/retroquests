@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fixture, call } from './helpers.js';
 const html=readFileSync(new URL('../../public/index.html',import.meta.url),'utf8');
-const home=html.slice(html.indexOf('<main class="wrap" id="home">'),html.indexOf('<main class="wrap" id="gameView"'));
+const home=html.slice(html.indexOf('<main class="wrap" id="home">'),html.indexOf('<main id="gameView"'));
 test('landing identifies the arcade before the original featured adventure',()=>{
   assert.match(home,/<h1[^>]*>Small pixels\.<br><span>Big adventures\.<\/span><\/h1>/);
   assert.ok(home.indexOf('arcadeTitle')<home.indexOf('featuredTitle'));
@@ -13,20 +13,20 @@ test('landing identifies the arcade before the original featured adventure',()=>
   assert.match(home,/href="#catalogue"/);
 });
 test('landing has honest demo, development and planned SKU-specific pricing',()=>{
-  assert.match(home,/Two-scene demo/);assert.doesNotMatch(home,/Coming 2027|2–3 hours|release gates|processed securely/);
+  assert.match(home,/Eight-chapter adventure/);assert.match(home,/full-game sales are not available yet/);assert.doesNotMatch(home,/Coming 2027|2–3 hours|release gates|processed securely/);
   assert.equal((home.match(/<span class="tag">In development<\/span>/g)||[]).length,2);
   assert.match(home,/<button[^>]*id="buyHero" disabled>Full game · <span data-price="port-lucky">\$7\.99<\/span><\/button>/);
   assert.match(home,/data-price="port-lucky-walkthrough">\$1\.99/);
   assert.equal((home.match(/data-price="port-lucky"/g)||[]).length,1);
   assert.match(home,/Planned pricing · USD/);
 });
-test('original handlers and hardened inline JS are unchanged except the approved inventory dialogue guard',()=>{
-  const scripts=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
-  const updated='function openInventory() {\n  // Browsing/selecting items does not advance dialogue; scene actions remain gated.\n  if (blocking || !game || document.querySelector(\'.inv-sheet\')) return;';
-  assert.ok(scripts.at(-1)[1].includes(updated));
-  const normalized=scripts.at(-1)[1].replace(updated,'function openInventory() {\n  if (msgOpen || blocking || !game) return;');
-  assert.equal(createHash('sha256').update(normalized).digest('hex'),'94553e423c3d10a050fd46b51872bffe089fd9b099ff0c608f0fcf274ccdb90f');
-  assert.match(html,/document\.querySelectorAll\('\[data-price\]'\)\.forEach\(el => el\.textContent = price\(el\.dataset\.price\)\)/);
+test('supplied game replaces legacy handlers while landing artwork remains exact',()=>{
+  assert.match(html,/<script type="module" src="\.\/portal.js"><\/script>/);
+  assert.doesNotMatch(html,/suiteAct|garageAct|parserForm|gameCanvas/);
+  const art=readFileSync(new URL('../../public/landing-art.js',import.meta.url),'utf8');
+  assert.match(art,/function drawSuiteCover/);assert.match(art,/function drawStarCover/);assert.match(art,/function drawCastleCover/);
+  const portal=readFileSync(new URL('../../public/portal.js',import.meta.url),'utf8');
+  assert.match(portal,/createPortLuckyHost/);assert.match(portal,/data-price/);
 });
 test('actual worker config keeps full-game and optional-hint prices distinct and sales disabled',async()=>{
   const res=await call(fixture(),'/api/config');assert.equal(res.status,200);

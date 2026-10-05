@@ -5,6 +5,8 @@
   "description": "Retro Quest Arcade: original Sierra-style adventure games, accounts, Stripe payments and paid walkthroughs on Cloudflare Workers + D1.",
   "type": "module",
   "scripts": {
+    "test:platform": "node --test tests/platform/*.test.js",
+    "test:port-lucky": "node tests/port-lucky/isolated.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "logs": "wrangler tail",

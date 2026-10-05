@@ -1,0 +1,129 @@
+import {createPortLuckyHost,mountManaged as mount} from './port-lucky-platform.js';
+import {drawLandingArt} from './landing-art.js';
+const $=id=>document.getElementById(id);
+const SKU_GAME='port-lucky',SKU_WALK='port-lucky-walkthrough';
+let account=null,ent={game:false,walk:false},catalog={};
+const escapeHtml=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(method,path,data){const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const out=await r.json();if(!r.ok)throw Object.assign(new Error(out.error || 'Request failed'),{status:r.status});return out;}
+function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,ent])!==JSON.stringify([s.user,next]);account=s.user;ent=next;catalog=s.catalog;if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
+export const host=createPortLuckyHost({container:$('gameMount'),mount,signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}});
+function showCatalogue(){document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
+async function startGame(){document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;try{await host.start();}catch(e){toast(e.message);await host.stop();showCatalogue();}}
+async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:c.catalog});}
+$('playHero').onclick=startGame;$('playCard').onclick=startGame;
+$('logoBtn').onclick=async()=>{await host.stop();showCatalogue();};
+$('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame();};
+drawLandingArt();refreshMe().catch(e=>toast(e.message));
+const query=new URLSearchParams(location.search);
+if(query.has('purchase') || query.has('signin')){history.replaceState(null,'',location.pathname);refreshMe().catch(()=>{});if(query.get('purchase')==='success')toast('Checking server ownership. A checkout return is not proof of payment.');if(query.get('signin')==='expired')signIn();}
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+/* ---------- Modals: sign-up, checkout, confirm ---------- */
+function modal(html, onClose) {
+  const v = document.createElement('div'); v.className = 'modal-veil'; v.innerHTML = html;
+  let closed=false;
+  const close = (silent=false) => { if(closed)return; closed=true; v.remove(); document.removeEventListener('keydown', esc); observer.disconnect(); if (!silent && onClose) onClose(); };
+  const esc = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', esc);
+  const observer = new MutationObserver(() => { if (!v.isConnected) close(); });
+  observer.observe($('modalRoot'), { childList: true });
+  v.addEventListener('click', e => { if (e.target === v) close(); });
+  $('modalRoot').appendChild(v);
+  return { el: v, close };
+}
+
+function signUp() {
+  let done; const promise=new Promise(r=>done=r);
+  const m = modal(`<form class="modal" id="suForm" novalidate role="dialog" aria-labelledby="suT"><h3 id="suT">Create your free account</h3>
+    <p>Free accounts play scene 1 of every game, and your saves follow you to any device.</p>
+    <div class="field"><label for="suName">Name</label><input id="suName" required autocomplete="name" placeholder="Your name"></div>
+    <div class="field"><label for="suEmail">Email</label><input id="suEmail" type="email" required autocomplete="email" placeholder="you@example.com"></div>
+    <div class="err" id="suErr" role="alert"></div>
+    <p class="note">No password needed. We email you a link whenever you sign in on a new device.</p>
+    <div class="row"><button type="button" class="btn ghost" id="suHave">I have an account</button><button class="btn" type="submit" id="suGo">Sign up free</button></div></form>`, done);
+  m.el.querySelector('#suName').focus();
+  m.el.querySelector('#suHave').onclick = () => { m.close(true); signIn().then(done); };
+  m.el.querySelector('#suForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = m.el.querySelector('#suName').value.trim(), email = m.el.querySelector('#suEmail').value.trim();
+    const err = m.el.querySelector('#suErr'); err.textContent = '';
+    if (!name) return err.textContent = 'Enter your name.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err.textContent = 'Enter an email address like name@example.com.';
+    const go = m.el.querySelector('#suGo'); go.disabled = true; go.textContent = 'Creating…';
+    try {
+      const r = await api('POST', '/api/signup', { name, email });
+      {
+        m.el.querySelector('form, .modal').innerHTML = `<h3>Check your email</h3><p>If your request was eligible, an email was accepted for ${escapeHtml(email)}. Open the single-use link to verify and sign in. Provider acceptance is not a guarantee of inbox delivery.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
+        m.el.querySelector('#okBtn').onclick = () => m.close();
+      }
+    } catch (x) { err.textContent = x.message; go.disabled = false; go.textContent = 'Sign up free'; }
+  });
+  return promise;
+}
+function signIn() {
+  let done; const promise=new Promise(r=>done=r);
+  const m = modal(`<form class="modal" id="siForm" novalidate role="dialog" aria-labelledby="siT"><h3 id="siT">Sign in</h3>
+    <p>Enter the email you signed up with. We'll send you a link that signs you in.</p>
+    <div class="field"><label for="siEmail">Email</label><input id="siEmail" type="email" required autocomplete="email" placeholder="you@example.com"></div>
+    <div class="err" id="siErr" role="alert"></div>
+    <div class="row"><button type="button" class="btn ghost" id="siNew">Create an account</button><button class="btn" type="submit" id="siGo">Email me a link</button></div></form>`, done);
+  m.el.querySelector('#siEmail').focus();
+  m.el.querySelector('#siNew').onclick = () => { m.close(true); signUp().then(done); };
+  m.el.querySelector('#siForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = m.el.querySelector('#siEmail').value.trim(), err = m.el.querySelector('#siErr'); err.textContent = '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err.textContent = 'Enter an email address like name@example.com.';
+    const go = m.el.querySelector('#siGo'); go.disabled = true; go.textContent = 'Sending…';
+    try {
+      const r = await api('POST', '/api/login', { email });
+      m.el.querySelector('.modal').innerHTML = `<h3>Check your email</h3><p>If ${escapeHtml(email)} has an account and is eligible, a sign-in email was accepted. Delivery is not guaranteed. It works once, for 30 minutes.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
+      m.el.querySelector('#okBtn').onclick = () => m.close();
+    } catch (x) { err.textContent = x.message; go.disabled = false; go.textContent = 'Email me a link'; }
+  });
+  return promise;
+}
+async function checkout(key){try{await host.adapter?.checkout(key==='walk'?SKU_WALK:SKU_GAME);}catch(e){toast(e.message);}}
+let toastT = null;
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
+
+/* ---------- Header / account ---------- */
+function renderNav() {
+  const n = $('nav'); n.innerHTML = '';
+  if (!account) {
+    const si = document.createElement('button'); si.className = 'btn small ghost'; si.textContent = 'Sign in'; si.onclick = () => signIn(); n.appendChild(si);
+    const b = document.createElement('button'); b.className = 'btn small'; b.textContent = 'Sign up free'; b.onclick = () => signUp(); n.appendChild(b);
+  } else {
+    const b = document.createElement('button'); b.className = 'btn small ghost'; b.textContent = account.name; b.setAttribute('aria-expanded', 'false');
+    b.onclick = () => { const m = $('acctMenu'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); renderMenu(); };
+    n.appendChild(b);
+  }
+}
+function renderMenu() {
+  const m = $('acctMenu');
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  m.innerHTML = `<div class="owned"><b>${esc(account.email)}</b>${account.verified ? '' : ' · not confirmed yet'}</div>
+    <div class="owned">Port Lucky: <b>${ent.game ? 'full game' : 'scene 1 (free)'}</b></div>
+    <div class="owned">Walkthrough: <b>${ent.walk ? 'owned' : 'not owned'}</b></div>`;
+  if (account.isAdmin) { const a = document.createElement('a'); a.className = 'btn small alt'; a.href = '/admin.html'; a.textContent = 'Admin'; a.style.textDecoration = 'none'; m.appendChild(a); }
+  const out = document.createElement('button'); out.className = 'btn small ghost'; out.textContent = 'Sign out';
+  out.onclick = async () => {try {await api('POST','/api/logout');await refreshMe();m.hidden=true;toast('Signed out. Unsaved in-memory progress cleared.');} catch(e){toast(e.message);} };
+  const del = document.createElement('button'); del.className = 'btn small ghost'; del.textContent = 'Delete my account';
+  del.onclick = () => { m.hidden = true; deleteAccount(); };
+  m.append(out, del);
+}
+function deleteAccount() {
+  const md = modal(`<form class="modal" id="delForm" role="alertdialog" aria-labelledby="delT"><h3 id="delT">Delete your account?</h3>
+    <p>This deletes personal account, save, session and hint records. Minimal detached financial records remain for accounting. Stripe retention is separate and is not deleted by this action. Purchased access cannot be restored.</p>
+    <div class="field"><label for="delEmail">Type your email to confirm</label><input id="delEmail" type="email" autocomplete="off"></div>
+    <div class="err" id="delErr" role="alert"></div>
+    <div class="row"><button type="button" class="btn alt" id="delNo">Keep my account</button><button class="btn ghost" type="submit">Delete account</button></div></form>`);
+  md.el.querySelector('#delNo').onclick = () => md.close();
+  md.el.querySelector('#delNo').focus();
+  md.el.querySelector('#delForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    try { await api('DELETE', '/api/account', { confirm: md.el.querySelector('#delEmail').value }); md.close(); await refreshMe(); toast('Your account has been deleted.'); }
+    catch (x) { md.el.querySelector('#delErr').textContent = x.message; }
+  });
+}
+document.addEventListener('click', e => { const m = $('acctMenu'); if (!m.hidden && !m.contains(e.target) && !$('nav').contains(e.target)) m.hidden = true; });
+
+

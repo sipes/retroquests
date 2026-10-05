@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import {createHmac} from 'node:crypto';
-const base='http://127.0.0.1:8787',admin='11111111-1111-4111-8111-111111111111',buyer='33333333-3333-4333-8333-333333333333';
+const base=process.env.PL_API_BASE || 'http://127.0.0.1:8787',admin='11111111-1111-4111-8111-111111111111',buyer='33333333-3333-4333-8333-333333333333';
 const results=[];async function check(name,fn){await fn();results.push({name,status:'PASS'});console.log('PASS',name);}
 async function api(path,{token,method='GET',data,raw,headers={},redirect='manual'}={}){return fetch(base+path,{method,redirect,headers:{...(token?{cookie:'rq_session='+token}:{}),...(data?{'content-type':'application/json'}:{}),...headers},body:raw??(data?JSON.stringify(data):undefined)});}
 let privileged;
