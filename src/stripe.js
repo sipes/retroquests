@@ -10,7 +10,39 @@ function form(obj, prefix = '', out = new URLSearchParams()) {
   return out;
 }
 
+const PRICE_BINDINGS = {
+  'port-lucky': 'STRIPE_PRICE_PORT_LUCKY',
+  'port-lucky-walkthrough': 'STRIPE_PRICE_PORT_LUCKY_WALKTHROUGH'
+};
+const paymentError = () => Object.assign(new Error('The payment page could not be opened. Please try again.'), { status: 502 });
+
+// Retrieve on every checkout with the same account/key that creates the session.
+// A configured but invalid binding must never fall back to an inline price.
+async function verifiedPrice(env, sku, product) {
+  const binding = PRICE_BINDINGS[sku];
+  if (!binding || env[binding] === undefined || env[binding] === null) return null;
+  const id = env[binding];
+  if (typeof id !== 'string' || !/^price_[A-Za-z0-9]+$/.test(id)) throw paymentError();
+  let res, price;
+  try {
+    res = await fetch(`https://api.stripe.com/v1/prices/${id}?expand%5B%5D=product`, {
+      headers: { 'Stripe-Version': '2024-06-20', authorization: `Bearer ${env.STRIPE_SECRET_KEY}` }
+    });
+    price = await res.json();
+  } catch { throw paymentError(); }
+  if (!res.ok || !price || price.id !== id || price.object !== 'price' || price.active !== true ||
+      price.currency !== 'usd' || price.unit_amount !== product.price_cents ||
+      price.type !== 'one_time' || price.recurring != null || price.billing_scheme !== 'per_unit' ||
+      price.custom_unit_amount != null || !['exclusive', 'unspecified'].includes(price.tax_behavior) ||
+      !price.product || typeof price.product !== 'object' || price.product.deleted || price.product.active !== true ||
+      price.product.metadata?.application !== 'retroquests' || price.product.metadata?.sku !== sku) {
+    throw paymentError();
+  }
+  return id;
+}
+
 export async function createCheckout(env, { product, sku, user, successUrl, cancelUrl }) {
+  const price = await verifiedPrice(env, sku, product);
   const params = {
     mode: 'payment',
     success_url: successUrl,
@@ -30,13 +62,17 @@ export async function createCheckout(env, { product, sku, user, successUrl, canc
     allow_promotion_codes: 'false',
     automatic_tax: { enabled: 'false' }
   };
+  if (price) {
+    delete params.line_items[0].price_data;
+    params.line_items[0].price = price;
+  }
   if (user.stripe_customer_id) params.customer = user.stripe_customer_id;
   else { params.customer_email = user.email; params.customer_creation = 'always'; }
 
 
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
-    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'Stripe-Version': '2024-06-20', authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded' },
     body: form(params)
   });
   const data = await res.json();

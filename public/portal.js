@@ -1,5 +1,6 @@
-import {createPortLuckyHost,mountManaged as mount} from './port-lucky-platform.js';
+import {createPortLuckyHost,mountManaged as mount,loadOwnedGame} from './port-lucky-platform.js';
 import {drawLandingArt} from './landing-art.js';
+import {authProof} from './auth-proof.js';
 const $=id=>document.getElementById(id);
 const SKU_GAME='port-lucky',SKU_WALK='port-lucky-walkthrough';
 let account=null,ent={game:false,walk:false},catalog={};
@@ -8,7 +9,7 @@ async function api(method,path,data){const r=await fetch(path,{method,credential
 function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,ent])!==JSON.stringify([s.user,next]);account=s.user;ent=next;catalog=s.catalog;if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
 export const host=createPortLuckyHost({container:$('gameMount'),mount,signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}});
 function showCatalogue(){document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
-async function startGame(){document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;try{await host.start();}catch(e){toast(e.message);await host.stop();showCatalogue();}}
+async function startGame(){await refreshMe();if(!account?.verified)return signIn();if(!ent.game){if(catalog[SKU_GAME]?.sale_enabled)return checkout('game');toast('Full-game delivery requires game ownership. Sales remain disabled during production verification.');return;}await loadOwnedGame();document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;try{await host.start();}catch(e){toast(e.message);await host.stop();showCatalogue();}}
 async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:c.catalog});}
 $('playHero').onclick=startGame;$('playCard').onclick=startGame;
 $('logoBtn').onclick=async()=>{await host.stop();showCatalogue();};
@@ -50,7 +51,7 @@ function signUp() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err.textContent = 'Enter an email address like name@example.com.';
     const go = m.el.querySelector('#suGo'); go.disabled = true; go.textContent = 'Creating…';
     try {
-      const r = await api('POST', '/api/signup', { name, email });
+      const r = await api('POST', '/api/signup', { name, email, turnstile_token: await authProof(m.el.querySelector('.modal')) });
       {
         m.el.querySelector('form, .modal').innerHTML = `<h3>Check your email</h3><p>If your request was eligible, an email was accepted for ${escapeHtml(email)}. Open the single-use link to verify and sign in. Provider acceptance is not a guarantee of inbox delivery.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
         m.el.querySelector('#okBtn').onclick = () => m.close();
@@ -74,14 +75,14 @@ function signIn() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err.textContent = 'Enter an email address like name@example.com.';
     const go = m.el.querySelector('#siGo'); go.disabled = true; go.textContent = 'Sending…';
     try {
-      const r = await api('POST', '/api/login', { email });
+      const r = await api('POST', '/api/login', { email, turnstile_token: await authProof(m.el.querySelector('.modal')) });
       m.el.querySelector('.modal').innerHTML = `<h3>Check your email</h3><p>If ${escapeHtml(email)} has an account and is eligible, a sign-in email was accepted. Delivery is not guaranteed. It works once, for 30 minutes.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
       m.el.querySelector('#okBtn').onclick = () => m.close();
     } catch (x) { err.textContent = x.message; go.disabled = false; go.textContent = 'Email me a link'; }
   });
   return promise;
 }
-async function checkout(key){try{await host.adapter?.checkout(key==='walk'?SKU_WALK:SKU_GAME);}catch(e){toast(e.message);}}
+async function checkout(key){try{if(host.adapter){await host.adapter.checkout(key==='walk'?SKU_WALK:SKU_GAME);return;}const r=await api('POST','/api/checkout',{sku:key==='walk'?SKU_WALK:SKU_GAME});const u=new URL(r.url);if(u.protocol!=='https:' || u.hostname!=='checkout.stripe.com')throw new Error('Invalid checkout URL');location.assign(u.href);}catch(e){toast(e.message);}}
 let toastT = null;
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
 

@@ -1,0 +1,44 @@
+{
+  "name": "retroquests-production",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "account_id": "ca4cf884ed842501d2454dfa44bdb78f",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "none"
+  },
+  "routes": [
+    {
+      "pattern": "retroquests.app",
+      "custom_domain": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "retroquests-production-db",
+      "database_id": "6bb0a376-221e-4813-93e9-d8c39d4d0e54",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "SITE_NAME": "Retro Quests",
+    "MAIL_FROM_NAME": "Retro Quests",
+    "MAIL_FROM_EMAIL": "noreply@strategico.co.za",
+    "ADMIN_EMAILS": "cp@strategico.co.za",
+    "CURRENCY": "usd",
+    "STRIPE_AUTOMATIC_TAX": "0",
+    "DEV_MODE": "0",
+    "CONTENT_APPROVED": "1",
+    "PROVIDER_APPROVED": "1",
+    "RELEASE_APPROVED": "0",
+    "TURNSTILE_HOSTNAME": "retroquests.app",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFOXi762ilF7BQiE",
+    "STRIPE_PRICE_PORT_LUCKY": "price_1UNArtEKHBH8mBfWqkjQF8Fn",
+    "STRIPE_PRICE_PORT_LUCKY_WALKTHROUGH": "price_1UNArwEKHBH8mBfWmyqk0PE8"
+  }
+}

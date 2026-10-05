@@ -30,10 +30,20 @@ export default {
 // ---------- Router ----------
 async function route(req, env, ctx, url) {
   const p = url.pathname, m = req.method;
+  // Refuse noncanonical encoded paths before static serving can decode them.
+  if (p.includes('%')) return json({error:'Not found'},404);
+  // Gate before the static-assets binding; unknown/private paths never fall back.
+  if (/^\/(?:__uat|tests|src|dev|scripts|evidence|\.git|\.env)(?:\/|$)/.test(p) || /\.(?:map|sql|sqlite|env)$/.test(p)) return json({error:'Not found'},404);
+  if (p.startsWith('/games/')) {
+    if (!p.startsWith('/games/port-lucky/')) return json({error:'Not found'},404);
+    const u = await requireUser(req,env);
+    if (!u.verified_at || !(await entitlementsFor(env,u.id)).includes('port-lucky')) throw new HttpError(402,'The full game requires a verified account and game ownership.');
+    return env.ASSETS.fetch(req);
+  }
   if (!p.startsWith('/api/') && !p.startsWith('/auth/')) return null;
   if (m !== 'GET' && m !== 'HEAD' && p !== '/api/stripe/webhook') checkSameOrigin(req, url);
 
-  if (p === '/api/config' && m === 'GET') return json({ catalog: publicCatalog(env), devMode: false, saleEnabled: saleEnabled(env), saveVersion: 1 });
+  if (p === '/api/config' && m === 'GET') return json({ catalog: publicCatalog(env), devMode: false, saleEnabled: saleEnabled(env), saveVersion: 1, turnstileSiteKey: env.TURNSTILE_SITE_KEY || null });
   if (p === '/api/me' && m === 'GET') return me(req, env);
   if (p === '/api/signup' && m === 'POST') return signup(req, env, url);
   if (p === '/api/login' && m === 'POST') return requestLogin(req, env, url);
@@ -107,7 +117,7 @@ function secureResponse(res, url) {
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options','nosniff'); h.set('Referrer-Policy','no-referrer'); h.set('X-Frame-Options','DENY');
   h.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
-  h.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  h.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
   if(url.protocol === 'https:') h.set('Strict-Transport-Security','max-age=31536000');
   if (!/^\/icons\/[a-z0-9-]+\.png$/.test(url.pathname) && url.pathname !== '/manifest.webmanifest') h.set('Cache-Control','no-store');
   return new Response(res.body,{status:res.status,statusText:res.statusText,headers:h});

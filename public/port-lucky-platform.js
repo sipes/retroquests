@@ -1,10 +1,13 @@
 // Narrow bridge for the supplied game. Save revisions belong to a mount, not a poll.
-import {Engine} from './games/port-lucky/engine.js';
-import {mount as suppliedMount} from './games/port-lucky/game.js';
-import {ROOMS} from './games/port-lucky/rooms.js';
+let Engine, suppliedMount, ROOMS;
+export async function loadOwnedGame(){
+ const modules=await Promise.all([import('./games/port-lucky/engine.js'),import('./games/port-lucky/game.js'),import('./games/port-lucky/rooms.js')]);
+ [Engine,suppliedMount,ROOMS]=[modules[0].Engine,modules[1].mount,modules[2].ROOMS];
+}
 // Retain the received engine before its async initialization, so even a rejected
 // supplied mount can be unmounted. Restore the synchronous hook immediately.
 export async function mountManaged(container,adapter,options){
+ if(!Engine) await loadOwnedGame();
  let engine;const original=Engine.prototype.mount;
  Engine.prototype.mount=function(...args){engine=this;return original.apply(this,args);};
  let pending;try{pending=suppliedMount(container,adapter,options);}finally{Engine.prototype.mount=original;}
@@ -46,6 +49,7 @@ export function createPortLuckyAdapter({fetch:fetcher=(...args)=>globalThis.fetc
   }
   identity=next;
   const envelope=me.save_envelopes?.['port-lucky'];
+  if(envelope && !ROOMS) await loadOwnedGame();
   if(envelope && (envelope.version!==1 || !Number.isSafeInteger(envelope.revision) || envelope.revision<0 || !validSave(envelope.data))){saveBlocked=true;throw new Error('Unsupported or invalid save retained. No automatic reset; contact the platform owner.');}
   if(!initialized){revision=envelope?.revision || 0; initialized=true;}
   state={user:me.user || null,entitlements:me.entitlements || [],save:envelope?.data || null,catalog:config.catalog || {}};
