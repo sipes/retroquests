@@ -1,0 +1,365 @@
+MSG Welcome back. Your game was saved right where you left it.
+> drink from cage
+DEATH You reach through the cage and take a swig from the unlabelled bottle, because a man who sleeps on granules has nothing 
+> look at shelves
+MSG Shelves of degreaser, descaler and something called SURFACE JOY. The bottom bracket has sheared, and the whole stack is being held up by an 
+> take wrench
+DEATH You pull the wrench out. The shelf comes down. Forty litres of degreaser, descaler and SURFACE JOY come down with it.
+
+Y
+> use door
+> break glass
+DEATH You put your elbow through the cabinet front. The axe is yours. So is the alarm, which sounds on every deck, and so, two
+> use closet door
+> look at me
+MSG You are Wim Tarragon, custodial contractor, fourteen months into a nine-month contract. There is a strip of tape on your forearm with your o
+> take coverall
+MSG You pull on the coverall. In the breast pocket: your contractor badge and a ten-credit coin taped to a note: "FOR EMERGENCIES — W." You do n
+> look at vent
+MSG You lie on the floor and look down through the vent into the Deck 8 corridor. Four people in grey Vellacourt coveralls walk past under you w
+> look at shelves
+MSG Shelves of degreaser, descaler and something called SURFACE JOY. The bottom bracket has sheared, and the whole stack is being held up by an 
+> take mop handle
+MSG You take your mop. It would be strange to leave without it.
+> use door
+> use coin on vending machine
+MSG The coin drops. The machine thinks about it for a long, long time, then surrenders the last SnakPak on Deck 9. Protein bar. The wrapper is t
+> use closet door
+> use snakpak on shelves
+MSG You wedge the SnakPak under the shelf bracket where the wrench is doing the work. The bar takes the load. The wrapper creaks. It is the stru
+> take wrench
+MSG You ease the wrench out. The shelf settles onto the SnakPak with a crunch. The bar is paste. The wrapper survives, as wrappers do, and you p
+> use mop on chute
+MSG "The chute!" says Mop. "I love the chute." You explain that it should go down to the laundry and work its way up through the ducts to wherev
+MSG Somewhere below, a happy whirring. Mop is in the chute. You are in a closet with a wrench and a ladder to find.
+> use door
+> use wrench on bolts
+MSG You climb the ladder with the wrench in your teeth, like a pirate, and take out three of the four bolts. The grille swings down on the fourt
+> climb ladder
+MSG You climb the ladder, haul yourself through the grille with your mop handle first, and crawl along a duct that smells of fourteen months of 
+MSG The cryo bay. Two thousand colonists asleep under blue light, and one pod standing open with your name on it.
+MSG Flashlights are working their way along the far row. Whoever they are, they are counting.
+> use main door
+DEATH You slip out through the main door into the corridor, straight into the fifth boarder, who was minding the trolley.
+
+"Co
+> lick hose
+DEATH You put your tongue on it.
+
+It said not to.Try againRestart scene
+> use terminal
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> use terminal
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> use terminal
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> use terminal
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> use terminal
+MSG The flashlights are one row away. You can hear them counting pods.
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> use terminal
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> use terminal
+DEATH A flashlight finds you between pod 1,204 and the drain. "Got a live one," says a voice. "Conscious crew?" says another. 
+> use terminal
+MSG You tap the terminal. CREW CARD REQUIRED. You show it your face. It is unmoved.
+> take notice
+MSG Back at the cryo bay door. The flashlights start their sweep again.
+> take notice
+MSG You unpin the notice. "Found derelict (no conscious crew aboard). Claimed under Lane Code 44.7." Ship's representative: a wax stamp of a smi
+> take hose
+MSG You take the coolant hose. The valve end is frosted. Your fingers tell you about it.
+> hide in pod
+MSG You climb into pod 1,205 and pull the lid to a finger's width. Blue light. Your own breath. Footsteps.
+MSG A flashlight plays over the glass, over the nameplate, over you, lying very still in a pod with no frost on it. "One thousand, two hundred a
+MSG The flashlights move off toward the main door, counting. You wait a long minute, then climb out. The sweep has passed. Upstairs, the crew ga
+> use stairs
+> climb duct
+DEATH You grab the duct grille with both hands.
+
+It is at soup temperature. You let go, eventually, from the floor of the cryo
+> take roster
+MSG You unclip the roster. The last line is handwritten: "Tarragon, W. — not crew, do not freeze, someone has to do the floors. — A.O." Not crew
+> look at captain
+MSG So: the captain wrote you onto the roster as not-crew, and the captain is the only person who can say otherwise, and the captain is locked b
+MSG Captain Adaeze Okonjo, asleep, hands folded, looking exactly like someone who reserved a pod for a contractor and then ordered him kept awak
+> take blanket
+MSG You take the fire blanket. The pouch says DO NOT USE AS BLANKET, which raises questions.
+> use blanket on duct
+MSG You wrap the fire blanket around the duct grille and your hands. The heat comes through, slowly, as a suggestion rather than a fact. Good en
+> climb duct
+MSG You go up the duct in the fire blanket like a dumpling, follow the smell of soup past two junctions, and drop out of a ceiling vent onto the
+MSG The galley duct drops you onto a serving counter. Something in the compost unit is rattling its lid, and a familiar cheerful voice says "Wim
+MSG Mop is back. Mop is very proud.
+> open corridor door
+DEATH You open the corridor door to see how far away the boots are.
+
+The boots are right there. "Conscious crew?" "Kitchen sta
+> use hatch
+> take tomato
+DEATH You reach for the ripe tomato at the end of the row.
+
+Thistle's pruning arm comes down the rail in two seconds flat and 
+> use galley hatch
+> look at compost
+MSG The compost unit. The lid is rattling by itself. Through the gap, something small, green and interested is looking at your badge. The badge 
+> take tray
+MSG You take a tray. Dishwasher-safe. Gumbo-edible, according to a crayon.
+> use tray on compost
+MSG You drop the plastic tray into the compost unit. There is a sound like a cat eating crisps. Then a fist-sized green blob climbs out onto the
+MSG Gumbo climbs onto your badge, considers it, and settles into your coverall pocket instead, purring. You have a stowaway. The stowaway has a 
+> use hatch
+> give roster to thistle
+MSG Thistle takes the roster in a manipulator and reads it with its lamp. Thirty names. Then the last line, in the captain's hand. "Tarragon, W.
+MSG "Not crew," says Thistle, slowly. "On the crew roster. By the captain. In ink." Its lamp dims a fraction. "The roster is the roster. Rule 2.
+MSG You take the crew card. Thistle hands back the roster. "Do not make me regret this," it says. "I will know. I have sensors."
+> take tomato
+MSG You take the ripe tomato. Thistle watches you do it and does not prune anything. "Crew ration," it says. "One. Do not come back for two."
+> take ties
+MSG You take a fistful of plant ties. "Thirty-one," says Thistle. "Crew ration. Your blob is drooling."
+> give ties to gumbo
+MSG Gumbo takes the plant ties one at a time, like sweets, and swells to the size of a loaf. It flexes something that is now, arguably, a hand.
+> use galley hatch
+> use crew card on locker
+MSG The locker reader takes the crew card, pauses as if to consult Thistle, and clicks open. Toolkit. Three days of rations. A bottle of oven cl
+MSG You take the toolkit, the rations and the oven cleaner. The laminated card in the toolkit says DO NOT GIVE TO CONTRACTORS. Nobody gave it to
+> use gumbo on wheel
+MSG You spin the wheel and set Gumbo on it. Gumbo grips. The ratchet tries to slip and finds a loaf of determined green blob in the way. The dog
+MSG Gumbo stays on the wheel, purring, holding a door against four people. You will collect it on the way out. It has earned the rest.
+> use hatch
+> look at vault
+MSG "The salvager asked about the vault," says Thistle, unprompted. "Twice. On the ship's channel, before they cut it. Where is the seed stock, 
+> use service duct
+MSG You collect Gumbo from the door wheel on the way past. The dogs stay seated; Gumbo has made its point. Then you and Mop go down the service 
+MSG Engineering. A cathedral of pipes around the jump drive, and a woman in headphones with the nav core open and her back to you.
+MSG Ilse, Vane's engineer. If she finishes the jump plot, this ship goes to the Vellacourt yards, and so do two thousand people who did not sign
+> talk to ilse
+DEATH "Excuse me," you say, loudly, to be heard over the headphones.
+
+She hears you. She turns around. She has a wrench too. H
+> use intake
+DEATH You put a hand on the intake housing. Behind you, a minute early, Ilse turns around to check the gauge.
+
+She has a wrenc
+> use airlock
+DEATH You cycle Airlock A without a suit, to see.
+
+You see. Briefly.Try againRestart scene
+> use red door
+> look at glass
+MSG Lead glass onto the reactor. A blue glow you should not look at for long. You look at it for a moment longer than that, because nobody has e
+> look at glass
+MSG You look again. The glow is beautiful. The dosimeter on the hook is not here to tell you to stop, so you tell yourself. Stop.
+> look at glass
+DEATH You look at the reactor through the lead glass for a third time, because it is beautiful, which it is.
+
+It is also the l
+> use door
+> talk to mop
+MSG "Mop," you say, "have you got any polish?" Mop's dome lights up. It has never once been asked. A hatch opens and a canister of MOP-7 floor p
+> press test button
+MSG You press TEST. At the far end of the hall, Zone 4 goes off like a Christmas card: foam from six nozzles, a klaxon, a flashing light. Ilse t
+MSG You have until she gets it shut off and walks back. Not long. The intake is right there.
+> use toolkit on intake
+MSG The quick-release quick-releases. You lift the filter cartridge out. It is clean, expensive, and the only thing between the loop and whateve
+> use catwalk
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+MSG Ilse is coming back along the catwalk. Finish what you are doing or close the housing.
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+MSG The catwalk runs the length of the hall. At the far end, Zone 4, the suppression nozzles. At this end, Ilse.
+> use catwalk
+DEATH Ilse comes back from the suppression nozzle, wiping foam off her headphones, and stops. The intake housing is open. The 
+> use polish on intake
+MSG Mop's floor polish goes into the loop, all of it, lasting shine, not for coolant loops. The canister hisses: empty of polish, full of propel
+> use oven cleaner on intake
+MSG Ilse is coming back along the catwalk. Finish what you are doing or close the housing.
+MSG The oven cleaner goes in after it. Sodium hydroxide meets floor polish somewhere in forty metres of pipe and forms, if the worried skull is 
+> use filter on intake
+MSG You seat the filter and snap the housing shut. The gauge thinks about it and settles at 99.8%. Clean, it says. Downstream of a filter that i
+> use red door
+MSG Ilse comes back from the suppression nozzle, wiping foam off her headphones, glances at the intake, sees a closed housing, and goes back to 
+> take dosimeter
+MSG You clip the dosimeter to your coverall. Green. Keep it that way.
+> take suit
+MSG You climb into the suit. It is a size too big and smells of the first officer. You cinch everything that cinches.
+> take helmet
+MSG You take the helmet. The crack in the visor is a finger long. The toolkit has tape.
+> use toolkit on helmet
+MSG You run the toolkit's tape around the cracked edge of the visor, twice, the way the laminated card says not to. It holds. Tape always does.
+> take oxygen
+MSG You take the bottle. Half full. A short walk, then. Don't take a long one.
+> take tether
+MSG You take the tether reel. The clip is the important part, your induction video said, fourteen months ago, to a room of thirty crew and one c
+> use suit check
+MSG SUIT CHECK: PASS. SIZE MISMATCH NOTED. CINCH TETHER AT WAIST. O2: 50%. HAVE A SAFE WALK, CREW MEMBER. It called you crew. It is a terminal. 
+> use door
+> use mop handle on airlock
+MSG You wedge your mop handle across the inner latch and cycle the lock. The inner door holds. The outer door opens. The pressure goes, and your
+MSG "I will find another way round," says Mop, through the inner glass. "I know the ducts. All of them." You nod. You cannot speak. You have jus
+MSG Outside. The Hyacinth's spine runs aft under more stars than you have ever seen, and the Lien sits on the hull like a tick.
+MSG Your wrist gauge says the bottle is half full. Your tether says nothing, because it is not clipped to anything yet.
+> use aft
+DEATH You move aft along the handrail, hand over hand, to the gap, and reach across.
+
+Your glove finds nothing. Your other glo
+> use tether on cleats
+MSG You clip the tether to a cleat by the airlock and give it a tug. Thirty metres. The clip is the important part. The clip is important.
+> take plate
+MSG You work the plate off its last bolt. It weighs nothing out here, which is a trick it will stop doing the moment you take it inside.
+> use plate on gap
+MSG You lay the shield plate across the gap in the handrail and seat its corners in the stanchions. It is exactly the size of the gap, because t
+> use aft
+MSG You cross the plate hand over hand, which is not what plates are for, and reach the dish on its gimbal, locked toward Vellacourt's beacon. B
+> take pin
+MSG You pull the lock pin. The gimbal is free, in theory. In practice the manual crank is frozen solid and the dish is not going anywhere until 
+> use toolkit on padlock
+MSG The cutters go through the Vellacourt padlock like it was a plant tie. The junction box swings open: a mic jack, a transmit key, and a label
+> use canister on crank
+MSG You jam the propellant canister against the frozen crank and crack it. A jet of warm gas, a noise you feel rather than hear, and the crank's
+> use crank
+MSG You wind the crank. The dish swings, slowly, off Vellacourt's beacon, across a lot of nothing, and onto a steady green pulse to port: LANE A
+> look at panel
+MSG RELAY: LANE AUTHORITY BEACON 7 — LOCK — CHANNEL OPEN. The ship is pointed at the law. The law is listening. What you say now is on the recor
+> use junction box
+CHOOSE "Luminous Hyacinth, colony transport, conscious crew aboard. Contesting salvage filing under Lane Code 44.7. Request a cutter at the jurisdiction line."
+MSG A pause. Then a human voice: "Hyacinth, Beacon 7. Filing noted as contested by conscious crew. Cutter dispatched to the line, ETA forty minu
+> use airlock c
+MSG You go in through Airlock C with eleven movements to spare, pop the helmet, and take the suit off in the lock. The air smells of coffee. Rea
+MSG Airlock C opens onto the captain's ready room. Real coffee. A locked drawer. Your own contract, framed, for reasons nobody has explained.
+MSG Through the bridge door, a very large man called Brack is eating a sandwich in the way of everything.
+> use coffee machine
+MSG You make a coffee. Real. The smell goes through the bridge door. Brack's head turns toward it like a flower.
+> give coffee to brack
+MSG "Oh," says Brack, taking the coffee in a hand the size of a tray. He drinks. His eyes close. "Haven't had real since Delphi." He steps out o
+> take contract
+MSG You take the contract out of the frame. Clause 9: "Contractor is not a member of the crew for any purpose." A margin note in the captain's h
+> use bridge door
+> talk to vane
+MSG "Mr Tarragon," says Vane, who has read your contract. "You are conscious, I grant you. You are not crew. The notice is accurate and the fili
+> give notice to vane
+MSG "My notice," says Vane, pleasantly. "No conscious crew aboard. You are conscious. You are a contractor. The notice stands." She hands it bac
+> give roster to vane
+MSG Vane reads the roster. "Not crew," she reads aloud. "In the captain's hand. Thank you." Dorrit, without looking up: "Handwritten annotations
+> give contract to vane
+MSG Vane reads clause 9 with real pleasure. "Not a member of the crew for any purpose." She taps the margin note. "A note is not an amendment. Y
+> use crew card on log console
+MSG The console takes the crew card and, since you are acting crew pending the captain, lets you query the captain. You ask it for every entry w
+MSG "03:14. Pod 1,205 (custodial) left unassigned per captain's order. Note: Tarragon to remain awake and is hereby assigned duties of Deck Offi
+> give log printout to vane
+MSG Vane reads the log printout. She reads it twice. Dorrit, without being asked: "A duly logged officer is crew for the purposes of 44.7, note 
+MSG "A filing error," she says. "Corrected at the yards, with my own signature, in thirty-six minutes. Nobody is waking anyone up before then." 
+MSG A floor plate lifts. Mop comes up through it, backwards, humming. "Wim! All the ducts! I did all of them!" It sees the holo. It sees the sta
+> talk to dorrit
+MSG "What does Vellacourt want with a colony ship?" you ask. "Two thousand farmers?" Dorrit, still reading: "The colonists are a liability line.
+> use mop on filing
+MSG "Mop," you say. "What did Captain Okonjo tell you about signing for things?" Mop's hum drops a tone. "Cleaning supplies. Only cleaning suppl
+MSG Mop rolls to the holo, extends a manipulator, and presses its stamp against the signature line, backwards. The stamp reads WITHDRAWN. The ho
+MSG Vane watches this with no expression at all. "A void signature," she says. "I will refile under my own at the yards. It changes the paperwor
+> talk to vane
+MSG "I think we are done," says Vane. "Brack, Mr Tarragon is chattel under the filing until it is assessed. Chattel travels with the vessel. Put
+MSG Brack puts you through the pressure door onto the collar and tells you to wait in the crate you came in. The door locks behind him.
+MSG Through the hull window, once a minute, your own mop drifts past. Mop watches it go, respectfully.
+> use wrench on keypad
+DEATH You lever the keypad off the wall with the wrench. It comes off. It also says, to every speaker on the Lien, INTRUSION, 
+> search crate
+MSG You peel the delivery slip off the crate lid. "DELIVERY: 1 x boarding party. Signed for by: [smiling mop]. Keypad code for return: 4471." Th
+> take sandwich
+MSG You take Brack's sandwich. You feel bad about it, briefly.
+> use keypad
+CHOOSE 4471
+MSG The keypad goes green. The pressure door grinds open onto the Lien's salvage hold: shelves of other ships' things, and the smell of a cat.
+> use drone
+DEATH You poke the cargo drone. It wakes up, assesses you, picks you up with four arms and files you on the top shelf between 
+> use corridor to crew quarters
+> take jacket
+MSG You reach for the jacket. Precedent, without appearing to move, puts four lines down the back of your hand. You withdraw the motion.
+> take jacket
+MSG You reach again. Precedent puts four more lines next to the first four, neatly, like a ledger. Something else. Food, perhaps. Not rations. P
+> take jacket
+DEATH You reach for the jacket a third time.
+
+Precedent files a claim on your face, your throat, and, on appeal, your hands. V
+> give sandwich to cat
+MSG You put Brack's sandwich down on the far side of the bunk. Precedent looks at you, at the sandwich, at the jacket it is guarding, and decide
+> search breast pocket
+MSG You unbutton the breast pocket. A card on Vellacourt stock: eight digits, and on the back, in Vane's hand, OKONJO. The captain's thaw code, 
+> use toolkit on lockbox
+MSG The lockbox gives to the driver on the third try. Inside: a Vellacourt bond certificate, a photo of a cat, and a clamp key on a tag that say
+> use gumbo on vent
+MSG You hold Gumbo up to the vent. It eats the insulation like a child eating candyfloss, lining and all, and swells in your hands to the size o
+> use cabin door
+> use light switch
+MSG You throw the switch. The hold and both corridors go dark. Down the right-hand corridor, Dorrit's tablet glows, and he keeps reading by it, 
+> use clamp room
+> hit dorrit
+DEATH You hit Dorrit. He drops the tablet, which is the first thing that has upset him all day.
+
+He is very upset. Vane's repo
+> use mop on corridor
+MSG Mop goes down the dark corridor to the hold and back, twice, humming, laying down the best floor polish of its life on Vellacourt deck plate
+> use loudspeaker
+MSG You key the speaker and say, in Vane's voice, which you have had all day to learn: "Dorrit. Hold. Now. Bring the key." Dorrit sighs, stands,
+MSG There is a sound like a man discovering physics. Dorrit goes the length of the corridor on his back, still holding the tablet, and comes to 
+MSG "Note (f)," says Dorrit faintly from the hold. "Floors." He does not get up. Mop, quietly: "That is the best thing a floor has ever done."
+> give key b to gumbo
+MSG You hand Gumbo clamp key B. It closes around it like a fist. "Hold," you say. Gumbo holds. Gumbo has been waiting all day to be asked.
+> use key a on left keyhole
+MSG Key A goes into keyhole A and stops, waiting for its partner a metre away. Two keys, two hands, one metre. The Lien was designed by someone 
+> use gumbo on right keyhole
+MSG You set Gumbo on the panel at keyhole B. It puts the key in with great concentration and looks at you. "On three," you say. Gumbo does not k
+> use panel
+MSG "Now," you say. You turn A. Gumbo turns B. The panel goes from red to amber to a green that means the lever is live and the Lien is about to
+> pull lever
+MSG You pull the lever. Two sounds like the ends of the world, one after the other, and the Lien is free: drifting off the Hyacinth's flank at t
+MSG Sixty seconds. The hold, the collar, the door. Mop is already moving. Run.
+> use hydraulics
+MSG Clamp hydraulics the size of tree trunks. Two docking clamps hold the Lien to the Hyacinth. Drop them and the Lien drifts off with everythin
+> use hydraulics
+MSG Clamp hydraulics the size of tree trunks. Two docking clamps hold the Lien to the Hyacinth. Drop them and the Lien drifts off with everythin
+> use hydraulics
+MSG Clamp hydraulics the size of tree trunks. Two docking clamps hold the Lien to the Hyacinth. Drop them and the Lien drifts off with everythin
+> use hydraulics
+MSG The collar groans. The pressure door is cycling closed. Run.
+MSG Clamp hydraulics the size of tree trunks. Two docking clamps hold the Lien to the Hyacinth. Drop them and the Lien drifts off with everythin
+> use hydraulics
+MSG Clamp hydraulics the size of tree trunks. Two docking clamps hold the Lien to the Hyacinth. Drop them and the Lien drifts off with everythin
+> use hydraulics
+MSG Clamp hydraulics the size of tree trunks. Two docking clamps hold the Lien to the Hyacinth. Drop them and the Lien drifts off with everythin
+> use hydraulics
+DEATH The pressure door seals with you on the wrong side of it. The Lien drifts off the Hyacinth with its loot, its captain's 
+> use corridor
+MSG The collar groans. The pressure door is cycling closed. Run.
+> use collar
+> use hyacinth
+MSG The pressure door starts to close. Mop gets under it, locks its wheels, and pushes up with every watt a floor polisher has. The door stops, 
+MSG You go. Through the gap, onto the collar, through the Hyacinth's hatch, which Brack did not relock because Brack is on the Hyacinth looking 
+MSG Behind you the Lien drifts off the hull with its loot, its cat, its captain's jacket and no code card. Ahead, six decks down, a captain, and
+MSG Mop's service lift. Built for a floor-polishing robot and nothing taller. Four minutes to the jurisdiction line, and six decks between you a
+MSG The clock in the corner is the Lane Authority's, not yours. It stops for nobody, except while you are reading.
+> use hatch
+MSG You fold yourself up through the roof hatch and sit on top of the lift car in the dark shaft, knees under your chin. Below, Mop says: "Ready
+> use buttons
+MSG Mop presses CRYO. The door closes. The lift drops six decks at a speed designed for a robot that cannot feel its stomach, with you on the ro
+MSG The lift stops. You unfold onto the crew gallery, where the thaw console is waiting for eight digits, and from the stairs comes the sound of
+> talk to brack
+CHOOSE "Please. There are two thousand people asleep down there."
+MSG "I know," says Brack, unhappily. "Vane knows. It's a liability line." He takes another step. You have one more sentence.
+> talk to brack
+CHOOSE "Take one more step and Gumbo eats your boots."
+DEATH Brack reaches you. He is gentle about it, which is the worst part.
+
+He puts you in a pod, cancels the thaw, and goes to 
+MSG The Lane Authority cutter is a minute from the jurisdiction line. If the captain of record when it arrives is Vane, Vane is the captain.
+DEATH The cutter crosses the jurisdiction line. "Hyacinth, Beacon 7. Is your captain in command?" On the bridge, pleasantly, C
+MSG Four minutes, again. The lift resets. Nothing else is forgiven.

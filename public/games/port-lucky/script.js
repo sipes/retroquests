@@ -905,5 +905,6 @@ export function createScript(E) {
     function finish() { if (g.done) return; g.done = true; E.persist(); say('Later, Benny and Lucy drive off in Mr. Sprinkles, because of course they do, with the jingle playing and Gus in the back. You stand on the terrace with a watch, a wallet and no napkin, and for the first time since 9:47 this morning, nobody is missing.', () => E.showFinal()); }
   };
 
-  return { act, combine, walkAction, itemLook, startChapter, onRestart, clockExpired, clockTick };
+  function itemLabel(id) { const g = G(); if (!g) return null; if (id === 'wallet') return g.money > 0 ? `Wallet ($${(g.money / 100).toFixed(0)})` : 'Wallet (empty)'; if (id === 'quarters') return `Quarters (${g.quarters})`; return null; }
+  return { act, combine, walkAction, itemLook, itemLabel, startChapter, onRestart, clockExpired, clockTick };
 }

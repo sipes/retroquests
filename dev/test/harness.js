@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const BASE = process.env.PL_BASE || 'http://localhost:8788/dev/port-lucky/';
-export const EVIDENCE = path.resolve('test-evidence');
+export const EVIDENCE = path.resolve(process.env.PL_EVIDENCE || 'test-evidence');
 fs.mkdirSync(EVIDENCE, { recursive: true });
 const EXEC = process.env.PL_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 

@@ -1,18 +1,12 @@
-// Last Night in Port Lucky — engine. Vanilla JS + canvas, Sierra-style.
-// All platform access goes through the injected adapter (see docs/port-lucky-integration.md).
-import { GAME_ID, SKU_GAME, SKU_WALK, MAX_SCORE, SAVE_VERSION, PAL, ITEMS, CHAPTERS, ROOM_CHAPTER, PUZZLES, LEVEL_NAMES, POINTS, rankFor } from './data.js';
-import { ROOMS } from './rooms.js';
-import { ART, drawPlayer } from './art.js';
-import { createScript, CHAPTER_START, migrateSave } from './script.js';
-import { TEMPLATE } from './template.js';
-
+// Retro Quest Arcade — shared adventure engine. Vanilla JS + canvas, Sierra-style.
+// A game passes a definition object (see public/games/port-lucky/game.js) and an injected platform adapter.
+// All platform access goes through the adapter (docs/port-lucky-integration.md §2.1).
+const LEVEL_NAMES = ['Nudge', 'Clue', 'Full solution'];
 const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];
-const CLOCK_RATE = 3;          // game-seconds per real second in chapter 7 (12 game-minutes = 4 real minutes)
-const CLOCK_START = 12 * 60;   // seconds
 
 export class Engine {
-  constructor(container, adapter, options = {}) {
-    this.container = container; this.adapter = adapter; this.options = options;
+  constructor(def, container, adapter, options = {}) {
+    this.D = def; this.container = container; this.adapter = adapter; this.options = options;
     this.account = null; this.ent = { game: false, walk: false }; this.catalog = {};
     this.game = null; this.view = 'idle'; this.verb = 'walk'; this.selItem = null;
     this.msgQueue = []; this.msgOpen = false; this.blocking = false; this.choiceOpen = false; this.modalCount = 0;
@@ -20,13 +14,13 @@ export class Engine {
     this.lastSnap = null; this.saveTimer = null; this.saveState = 'idle'; this.lastSaveError = null;
     this.hintTexts = {}; this.shown = {}; this.unsub = null; this.destroyed = false;
     this.settings = { wait10: true };
-    try { const s = JSON.parse(localStorage.getItem('rq-port-lucky-settings') || 'null'); if (s && typeof s.wait10 === 'boolean') this.settings = s; } catch (e) {}
-    this.script = createScript(this);
+    try { const s = JSON.parse(localStorage.getItem('rq-' + def.GAME_ID + '-settings') || 'null'); if (s && typeof s.wait10 === 'boolean') this.settings = s; } catch (e) {}
+    this.script = def.createScript(this);
   }
 
   // ---------- Mount / unmount ----------
   async mount() {
-    const root = document.createElement('div'); root.className = 'pl-game'; root.innerHTML = TEMPLATE;
+    const root = document.createElement('div'); root.className = 'pl-game'; root.innerHTML = this.D.template(this.D.texts);
     this.container.appendChild(root); this.root = root;
     this.$ = id => root.querySelector('[data-id="' + id + '"]');
     this.cv = this.$('canvas'); this.cx = this.cv.getContext('2d');
@@ -60,10 +54,10 @@ export class Engine {
     try { st = await this.adapter.getState(); } catch (e) { st = { user: null, entitlements: [], save: null, catalog: {} }; this.toast('Could not reach the arcade. Playing offline until it comes back.'); }
     this.account = st.user || null;
     const owned = st.entitlements || [];
-    this.ent = { game: owned.includes(SKU_GAME), walk: owned.includes(SKU_WALK) };
+    this.ent = { game: owned.includes(this.D.SKU_GAME), walk: owned.includes(this.D.SKU_WALK) };
     if (st.catalog) this.catalog = st.catalog;
     const sv = st.save;
-    this.game = this.account && sv && typeof sv === 'object' && sv.flags ? migrateSave(sv) : null;
+    this.game = this.account && sv && typeof sv === 'object' && sv.flags ? this.D.migrateSave(sv) : null;
     if (this.game && this.account) this.game.ownerId = this.account.id;
     return st;
   }
@@ -80,7 +74,7 @@ export class Engine {
       if (!user) { this.toast('Signed out.'); if (this.options.onExit) this.options.onExit('signed-out'); else this.start(); return; }
       this.toast(`Signed in as ${this.account.email}.`); this.start(); return;
     }
-    if (!prevGame && this.ent.game && this.game && this.game.flags.leftSuite && this.game.chapter === 1) {
+    if (!prevGame && this.ent.game && this.game && this.game.flags[this.D.chapter1DoneFlag] && this.game.chapter === 1) {
       this.clearOverlays(); this.toast('Full game unlocked. Enjoy!'); this.script.startChapter(2);
     }
     if (this.$('drawer') && !this.$('drawer').hidden) this.renderDrawer();
@@ -94,19 +88,19 @@ export class Engine {
     this.view = 'game'; this.$('gate').hidden = true; this.$('stage').hidden = false;
     this.bgKey = ''; this.selItem = null; this.verb = 'walk'; this.renderVerbs(); this.renderInv(); this.updateHud();
     if (this.game.done) { this.showFinal(); return; }
-    if (this.game.chapter === 1 && this.game.flags.leftSuite) { if (this.ent.game) this.script.startChapter(2); else this.showPaywall(); return; }
+    if (this.game.chapter === 1 && this.game.flags[this.D.chapter1DoneFlag]) { if (this.ent.game) this.script.startChapter(2); else this.showPaywall(); return; }
     if (this.game.chapter > 1 && !this.ent.game) { this.showPaywall(); return; }
-    if (this.game.chapter === 7) this.updateClockUI();
+    this.updateClockUI();
     this.say('Welcome back. Your game was saved right where you left it.');
   }
   newGame() {
-    return { v: SAVE_VERSION, chapter: 1, room: 'suite', inv: [], flags: {}, scored: {}, score: 0, hintsUsed: 0, revealed: {}, px: 150, py: 160, dir: 1, started: false, money: 0, quarters: 0, clock: null, checkpoint: null, done: false };
+    return Object.assign({ v: this.D.SAVE_VERSION, chapter: 1, room: this.D.startRoom, inv: [], flags: {}, scored: {}, score: 0, hintsUsed: 0, revealed: {}, px: this.D.startPos[0], py: this.D.startPos[1], dir: 1, started: false, clock: null, checkpoint: null, done: false }, this.D.newGameExtras || {});
   }
   snapshot() { const g = JSON.parse(JSON.stringify(this.game)); delete g.checkpoint; return g; }
   setCheckpoint() { this.game.checkpoint = this.snapshot(); }
   restartScene() {
     const g = this.game; if (!g) return;
-    const cp = g.checkpoint || CHAPTER_START(g.chapter);
+    const cp = g.checkpoint || this.D.CHAPTER_START(g.chapter);
     const keep = { hintsUsed: g.hintsUsed, revealed: g.revealed };
     this.game = Object.assign(JSON.parse(JSON.stringify(cp)), keep, { checkpoint: cp });
     this.clearTransient(); this.clearOverlays();
@@ -118,7 +112,7 @@ export class Engine {
 
   // ---------- Saving ----------
   persist() {
-    try { localStorage.setItem('rq-port-lucky-settings', JSON.stringify(this.settings)); } catch (e) {}
+    try { localStorage.setItem('rq-' + this.D.GAME_ID + '-settings', JSON.stringify(this.settings)); } catch (e) {}
     if (!this.account || !this.game) return;
     clearTimeout(this.saveTimer); this.saveTimer = setTimeout(() => this.flushSave(false), 800);
   }
@@ -129,7 +123,7 @@ export class Engine {
     const data = JSON.parse(JSON.stringify(this.game));
     this.setSaveState('saving');
     let p;
-    try { p = Promise.resolve(this.adapter.save(GAME_ID, data, { keepalive: !!keepalive, ownerId: this.game.ownerId || this.account.id })); } catch (e) { p = Promise.reject(e); }
+    try { p = Promise.resolve(this.adapter.save(this.D.GAME_ID, data, { keepalive: !!keepalive, ownerId: this.game.ownerId || this.account.id })); } catch (e) { p = Promise.reject(e); }
     return p.then(() => this.setSaveState('saved')).catch(e => { this.lastSaveError = e; this.setSaveState('failed'); });
   }
   setSaveState(s) {
@@ -193,7 +187,7 @@ export class Engine {
 
   // ---------- Score / inventory ----------
   points(key) {
-    const n = POINTS[key]; if (n == null) { console.warn('Unknown points key', key); return; }
+    const n = this.D.POINTS[key]; if (n == null) { console.warn('Unknown points key', key); return; }
     if (this.game.scored[key]) return;
     this.game.scored[key] = true; this.game.score += n; this.updateHud();
     const f = document.createElement('div'); f.className = 'float'; f.textContent = '+' + n;
@@ -203,43 +197,41 @@ export class Engine {
   has(id) { return this.game.inv.includes(id); }
   give(id) { if (!this.has(id)) this.game.inv.push(id); this.renderInv(); }
   drop(id) { this.game.inv = this.game.inv.filter(i => i !== id); if (this.selItem === id) this.selItem = null; this.renderInv(); }
-  room() { return ROOMS[this.game.room]; }
+  room() { return this.D.ROOMS[this.game.room]; }
   spotName(id) { const s = this.room().spots.find(x => x.id === id); return s ? s.name : id; }
   activeSpots() { return this.room().spots.filter(s => !s.when || s.when(this.game)); }
   gotoRoom(id, px, py, dir) { this.game.room = id; this.game.px = px; this.game.py = py; this.game.dir = dir || 1; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.updateHud(); this.persist(); }
   updateHud() {
     const g = this.game; if (!g || !this.root) return;
-    this.$('score').textContent = `Score: ${g.score} of ${MAX_SCORE}`;
+    this.$('score').textContent = `Score: ${g.score} of ${this.D.MAX_SCORE}`;
     this.$('roomtxt').textContent = this.room().title;
     this.$('hints').textContent = `Hints: ${g.hintsUsed}`;
     const inv = this.$('invcount'); if (inv) inv.textContent = g.inv.length;
   }
 
   // ---------- Clock (chapter 7 only) ----------
-  clockActive() { const g = this.game; return !!(g && g.chapter === 7 && g.clock != null && !g.flags.ceremonyReady && !g.done); }
+  clockActive() { const g = this.game, ck = this.D.clock; return !!(ck && g && g.chapter === ck.chapter && g.clock != null && !g.flags[ck.stopFlag] && !g.done); }
   clockPaused() { return this.msgOpen || this.choiceOpen || this.blocking || this.modalCount > 0 || !this.$('drawer').hidden || document.hidden || this.view !== 'game'; }
   tickClock(dt) {
     if (!this.clockActive() || this.clockPaused()) return;
-    this.game.clock = Math.max(0, this.game.clock - dt * CLOCK_RATE);
+    this.game.clock = Math.max(0, this.game.clock - dt * this.D.clock.rate);
     this.updateClockUI(); if (this.script.clockTick) this.script.clockTick(this.game.clock);
     if (this.game.clock <= 0) { this.game.clock = 0; this.script.clockExpired(); }
   }
   updateClockUI() {
     const el = this.$('clock'); if (!el) return;
     if (!this.clockActive()) { el.hidden = true; return; }
-    el.hidden = false; const s = Math.ceil(this.game.clock); const m = Math.floor(s / 60), r = s % 60;
-    const elapsedMin = Math.floor((CLOCK_START - s) / 60); const wall = 48 + elapsedMin;
-    el.textContent = `${wall >= 60 ? '4:00' : '3:' + wall} · ${m}:${String(r).padStart(2, '0')} left`;
-    el.classList.toggle('late', s <= 120);
+    el.hidden = false; const s = Math.ceil(this.game.clock);
+    el.textContent = this.D.clock.label(s); el.classList.toggle('late', s <= this.D.clock.lateAt);
   }
-  startClock() { this.game.clock = CLOCK_START; this.updateClockUI(); }
+  startClock() { this.game.clock = this.D.clock.start; this.updateClockUI(); }
 
   // ---------- Rendering ----------
   render(t) {
     const dt = Math.min(0.25, (t - this.lastTick) / 1000); this.lastTick = t; this.frame++;
     if (this.view !== 'game' || !this.game) return;
     this.tickClock(dt);
-    const g = this.game, art = ART[g.room]; if (!art) return;
+    const g = this.game, art = this.D.ART[g.room]; if (!art) return;
     const key = g.room + JSON.stringify(g.flags);
     if (key !== this.bgKey) { this.bx.clearRect(0, 0, 320, 180); art.bg(this.bx, g); this.bgKey = key; }
     this.cx.drawImage(this.bg, 0, 0);
@@ -250,12 +242,12 @@ export class Engine {
     }
     const step = this.walkTarget ? Math.floor(this.frame / 6) % 2 : 0;
     const items = art.props ? art.props(this.cx, g, this.frame) : [];
-    if (!g.flags.hidePlayer) items.push({ y: g.py, d: () => drawPlayer(this.cx, g.px, g.py, g.dir, step) });
+    if (!g.flags.hidePlayer) items.push({ y: g.py, d: () => this.D.drawPlayer(this.cx, g.px, g.py, g.dir, step) });
     items.sort((a, b) => a.y - b.y).forEach(i => i.d());
   }
 
   // ---------- Interaction ----------
-  hitTest(x, y) { // room hotspots first; the player's own sprite is the lowest-priority target so Dex never blocks what he is standing in front of
+  hitTest(x, y) { // room hotspots first; the player's own sprite is the lowest-priority target so the hero never blocks what they are standing in front of
     const spots = this.activeSpots(); let me = null;
     for (const s of spots) {
       if (s.dyn) { me = s; continue; }
@@ -290,7 +282,7 @@ export class Engine {
   onCanvasMove(e) {
     if (!this.game || this.view !== 'game') return;
     const [x, y] = this.canvasPoint(e); const s = this.hitTest(x, y);
-    const vName = this.selItem ? `Use ${ITEMS[this.selItem].name} on` : ({ walk: 'Walk to', look: 'Look at', take: 'Take', use: 'Use', talk: 'Talk to' })[this.verb];
+    const vName = this.selItem ? `Use ${this.D.ITEMS[this.selItem].name} on` : ({ walk: 'Walk to', look: 'Look at', take: 'Take', use: 'Use', talk: 'Talk to' })[this.verb];
     this.$('hover').textContent = s ? `${vName} ${s.name}` : (this.selItem ? `${vName} …` : ' ');
   }
   renderVerbs() {
@@ -303,7 +295,7 @@ export class Engine {
     const g = this.game; const n = g ? g.inv.length : 0; const ic = this.$('invcount'); if (ic) ic.textContent = n;
     if (this.selItem && g) {
       const u = document.createElement('div'); u.className = 'using';
-      const t = document.createElement('span'); t.textContent = `Using ${ITEMS[this.selItem].name}. Tap what to use it on.`;
+      const t = document.createElement('span'); t.textContent = `Using ${this.D.ITEMS[this.selItem].name}. Tap what to use it on.`;
       const c = document.createElement('button'); c.type = 'button'; c.textContent = 'Cancel'; c.onclick = e => { e.stopPropagation(); this.selItem = null; this.renderInv(); this.renderVerbs(); };
       u.append(t, c); this.$('view').appendChild(u);
     }
@@ -311,7 +303,7 @@ export class Engine {
     if (!g || !g.inv.length) { const s = document.createElement('span'); s.className = 'empty'; s.textContent = 'Nothing yet. Your pockets are as empty as your memory.'; box.appendChild(s); return; }
     g.inv.forEach(id => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'item'; b.setAttribute('aria-pressed', String(this.selItem === id)); b.dataset.item = id;
-      const i = document.createElement('i'); i.style.background = PAL[ITEMS[id].color]; b.append(i, document.createTextNode(this.itemLabel(id)));
+      const i = document.createElement('i'); i.style.background = this.D.PAL[this.D.ITEMS[id].color]; b.append(i, document.createTextNode(this.itemLabel(id)));
       b.title = 'Select to use on something. With Look selected, examines it.';
       b.onclick = () => {
         if (this.msgOpen || this.blocking || this.choiceOpen) return;
@@ -322,11 +314,7 @@ export class Engine {
       box.appendChild(b);
     });
   }
-  itemLabel(id) {
-    if (id === 'wallet' && this.game) return this.game.money > 0 ? `Wallet ($${(this.game.money / 100).toFixed(0)})` : 'Wallet (empty)';
-    if (id === 'quarters' && this.game) return `Quarters (${this.game.quarters})`;
-    return ITEMS[id].name;
-  }
+  itemLabel(id) { return (this.script.itemLabel && this.script.itemLabel(id)) || this.D.ITEMS[id].name; }
 
   // ---------- Parser ----------
   parse(raw) {
@@ -341,7 +329,7 @@ export class Engine {
       give: ['give','feed','offer','hand','show','throw','tip'],
       drink: ['drink','sip','taste','swallow'], eat: ['eat','chew','lick','bite'],
       play: ['play','blow','toot','sing'], search: ['search','rummage','dig'],
-      sit: ['sit','lie','sleep','rest'], walk: ['go','walk','leave','exit','move','run','enter'],
+      sit: ['sit','lie','sleep','rest','hide','fold'], walk: ['go','walk','leave','exit','move','run','enter'],
       inv: ['inventory','inv','i','items','pockets'], help: ['help','?','commands'], score: ['score','points'],
       hints: ['hint','hints','stuck','walkthrough','clue'], save: ['save'], restart: ['restart']
     };
@@ -355,12 +343,12 @@ export class Engine {
     if (v === 'restart') return this.$('restart').click();
     if (v === 'inv' && this.landscapePhone()) return this.openInventory();
     if (v === 'inv') return this.say(g.inv.length ? 'You are carrying: ' + g.inv.map(i => this.itemLabel(i)).join(', ') + '.' : 'You are carrying nothing. Not even a plan.');
-    if (v === 'help') return this.say('Type simple commands: LOOK, LOOK AT GOAT, TAKE TICKET, OPEN MINIBAR, GIVE CRACKERS TO GOAT, USE KEYCARD ON DOOR, TALK TO VALET, INVENTORY. Or click a verb, then click the room.');
-    if (v === 'score') return this.say(`Your score is ${g.score} of ${MAX_SCORE}.`);
+    if (v === 'help') return this.say(this.D.texts.help);
+    if (v === 'score') return this.say(`Your score is ${g.score} of ${this.D.MAX_SCORE}.`);
     if (v === 'hints') return this.openDrawer();
     const pad = ' ' + phrase + ' ';
     const matchIn = list => { let best = null, bl = 0; list.forEach(e => e.words.forEach(w => { if (pad.includes(' ' + w + ' ') && w.length > bl) { best = e; bl = w.length; } })); return best; };
-    const invEntries = g.inv.map(id => ({ id, words: ITEMS[id].words }));
+    const invEntries = g.inv.map(id => ({ id, words: this.D.ITEMS[id].words }));
     const spots = this.activeSpots();
     let it = matchIn(invEntries); let restAfter = phrase;
     if (it) { const w = it.words.find(w => pad.includes(' ' + w + ' ')); restAfter = pad.replace(' ' + w + ' ', ' ').trim(); }
@@ -379,7 +367,7 @@ export class Engine {
     if (it && !sp) {
       if (v === 'look' || v === 'search') return this.say(this.script.itemLook(it.id));
       if (v === 'use') return this.act('use', 'me', it.id);
-      if (v === 'give') return this.say(`Give the ${ITEMS[it.id].name.toLowerCase()} to whom?`);
+      if (v === 'give') return this.say(`Give the ${this.D.ITEMS[it.id].name.toLowerCase()} to whom?`);
       if (v === 'eat' || v === 'drink' || v === 'play' || v === 'take' || v === 'sit') return this.act(v, 'me', it.id);
       return this.say('Nothing happens.');
     }
@@ -405,16 +393,16 @@ export class Engine {
     this.view = 'game'; this.$('gate').hidden = true; this.$('stage').hidden = false; this.updateHud();
     this.root.querySelectorAll('.overlay-card').forEach(n => n.remove());
     const o = this.overlay(`<div class="modal" role="dialog" aria-labelledby="pl-pwT"><h3 id="pl-pwT">End of the free scene</h3>
-      <p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Your progress is saved.</p>
-      <div class="price-big">${this.price(SKU_GAME)}</div><p class="note">One-time purchase. Secure card payment handled by the arcade.</p>
+      <p>${this.D.texts.paywall}</p>
+      <div class="price-big">${this.price(this.D.SKU_GAME)}</div><p class="note">One-time purchase. Secure card payment handled by the arcade.</p>
       <div class="row"><button type="button" class="btn ghost" data-a="back">Back to games</button><button type="button" class="btn" data-a="buy">Unlock full game</button></div></div>`);
-    o.querySelector('[data-a=buy]').onclick = () => this.checkout(SKU_GAME);
+    o.querySelector('[data-a=buy]').onclick = () => this.checkout(this.D.SKU_GAME);
     o.querySelector('[data-a=back]').onclick = () => { o.remove(); this.blocking = false; if (this.options.onExit) this.options.onExit('paywall'); };
     o.querySelector('[data-a=buy]').focus();
   }
   async checkout(sku) {
     if (!this.account) { try { await this.adapter.signUp(); } catch (e) {} await this.refreshState(); if (!this.account) return; }
-    if (sku === SKU_WALK && !this.ent.game) sku = SKU_GAME;
+    if (sku === this.D.SKU_WALK && !this.ent.game) sku = this.D.SKU_GAME;
     const m = this.modal(`<div class="modal" role="dialog"><h3>Opening secure checkout…</h3><p>${this.catalog[sku] ? this.catalog[sku].name : sku} · ${this.price(sku)}</p><p class="note">You'll pay on the arcade's secure page, then come straight back here. Your game is saved.</p><div class="err" data-id="coErr" role="alert"></div><div class="row"><button type="button" class="btn ghost" data-a="cancel">Cancel</button></div></div>`);
     m.el.querySelector('[data-a=cancel]').onclick = () => m.close();
     try { await this.flushSave(false); await this.adapter.checkout(sku); m.close(); await this.onPlatformChange(); }
@@ -424,9 +412,9 @@ export class Engine {
     const g = this.game; this.view = 'game';
     this.msgQueue = []; this.msgOpen = false; this.root.querySelectorAll('.overlay-card, [data-id="view"] .sierra').forEach(n => n.remove());
     const margin = g.flags.margin != null ? `${Math.floor(g.flags.margin / 60)}:${String(g.flags.margin % 60).padStart(2, '0')}` : '—';
-    const o = this.overlay(`<div class="modal final" role="dialog" aria-labelledby="pl-fT"><h3 id="pl-fT">${rankFor(g.score)}</h3>
-      <p>Score: ${g.score} of ${MAX_SCORE} · Hints used: ${g.hintsUsed} · Margin at the altar: ${margin}</p>
-      <p class="note">${g.score >= MAX_SCORE ? 'Every point. Every kindness. Dex Morrow, Best Man.' : 'There were things you missed. There always are. Port Lucky will still be here.'}</p>
+    const o = this.overlay(`<div class="modal final" role="dialog" aria-labelledby="pl-fT"><h3 id="pl-fT">${this.D.rankFor(g.score)}</h3>
+      <p>Score: ${g.score} of ${this.D.MAX_SCORE} · Hints used: ${g.hintsUsed} · ${this.D.texts.marginLabel}: ${margin}</p>
+      <p class="note">${g.score >= this.D.MAX_SCORE ? this.D.texts.finalPerfect : this.D.texts.finalOther}</p>
       <div class="row"><button type="button" class="btn ghost" data-a="back">Back to games</button><button type="button" class="btn" data-a="again">Play again</button></div></div>`);
     o.querySelector('[data-a=again]').onclick = () => { o.remove(); this.blocking = false; this.game = this.newGame(); this.game.ownerId = this.account && this.account.id; this.script.startChapter(1, { fresh: true }); };
     o.querySelector('[data-a=back]').onclick = () => { o.remove(); this.blocking = false; if (this.options.onExit) this.options.onExit('finished'); };
@@ -435,7 +423,7 @@ export class Engine {
   // ---------- Hint drawer ----------
   async loadHints() {
     if (!this.account || !this.ent.walk || !this.adapter.listHints) return;
-    try { const r = await this.adapter.listHints(GAME_ID); const rev = {}; (r.revealed || []).forEach(h => { if (h.text) this.hintTexts[h.puzzle_id + h.level] = h.text; rev[h.puzzle_id] = Math.max(rev[h.puzzle_id] ?? -1, h.level); }); if (this.game) { this.game.revealed = rev; this.game.hintsUsed = r.count || 0; this.updateHud(); } } catch (e) {}
+    try { const r = await this.adapter.listHints(this.D.GAME_ID); const rev = {}; (r.revealed || []).forEach(h => { if (h.text) this.hintTexts[h.puzzle_id + h.level] = h.text; rev[h.puzzle_id] = Math.max(rev[h.puzzle_id] ?? -1, h.level); }); if (this.game) { this.game.revealed = rev; this.game.hintsUsed = r.count || 0; this.updateHud(); } } catch (e) {}
   }
   openDrawer() { this.shown = {}; this.renderDrawer(); this.loadHints().then(() => { if (!this.$('drawer').hidden) this.renderDrawer(); }); this.$('drawer').hidden = false; this.$('drawerveil').hidden = false; const f = this.$('drawer').querySelector('button'); if (f) f.focus(); }
   closeDrawer(silent) { this.$('drawer').hidden = true; this.$('drawerveil').hidden = true; this.shown = {}; if (!silent) this.refocus(); }
@@ -445,11 +433,11 @@ export class Engine {
     head.innerHTML = `<div><h3>Stuck?</h3><p class="sub">${g ? this.room().title : ''} · hints used: ${g ? g.hintsUsed : 0}</p></div>`;
     const x = document.createElement('button'); x.type = 'button'; x.className = 'btn small ghost'; x.textContent = 'Close'; x.onclick = () => this.closeDrawer(); head.appendChild(x); d.appendChild(head);
     if (!g) return;
-    const list = PUZZLES[g.room] || [];
+    const list = this.D.PUZZLES[g.room] || [];
     if (!this.ent.game || !this.ent.walk) {
       const l = document.createElement('div'); l.className = 'locked';
-      l.innerHTML = this.ent.game ? `<strong>The walkthrough is an add-on.</strong><span>It has a nudge, a clue and the full solution for every puzzle. Nothing is shown until you choose to reveal it.</span>` : `<strong>The walkthrough comes with the full game.</strong><span>Unlock Last Night in Port Lucky first, then add the walkthrough for ${this.price(SKU_WALK)}. Hints stay hidden until you choose to reveal them.</span>`;
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = this.ent.game ? `Add walkthrough · ${this.price(SKU_WALK)}` : `Unlock the full game · ${this.price(SKU_GAME)}`; b.onclick = () => this.checkout(SKU_WALK);
+      l.innerHTML = this.ent.game ? `<strong>The walkthrough is an add-on.</strong><span>It has a nudge, a clue and the full solution for every puzzle. Nothing is shown until you choose to reveal it.</span>` : `<strong>The walkthrough comes with the full game.</strong><span>Unlock ${this.D.texts.title} first, then add the walkthrough for ${this.price(this.D.SKU_WALK)}. Hints stay hidden until you choose to reveal them.</span>`;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = this.ent.game ? `Add walkthrough · ${this.price(this.D.SKU_WALK)}` : `Unlock the full game · ${this.price(this.D.SKU_GAME)}`; b.onclick = () => this.checkout(this.D.SKU_WALK);
       l.appendChild(b); d.appendChild(l);
       const t = document.createElement('p'); t.className = 'sub'; t.textContent = `Puzzles in this scene: ${list.map(p => p.title).join(' · ')}`; d.appendChild(t); return;
     }
@@ -464,7 +452,7 @@ export class Engine {
         b.onclick = () => {
           if (i <= got) { this.shown[p.id + i] = !this.shown[p.id + i]; return this.renderDrawer(); }
           this.confirmReveal(p, i, async () => {
-            try { const r = await this.adapter.revealHint(GAME_ID, p.id, i); this.hintTexts[p.id + i] = r.text; g.revealed[p.id] = i; g.hintsUsed++; this.shown[p.id + i] = true; this.persist(); this.updateHud(); this.renderDrawer(); }
+            try { const r = await this.adapter.revealHint(this.D.GAME_ID, p.id, i); this.hintTexts[p.id + i] = r.text; g.revealed[p.id] = i; g.hintsUsed++; this.shown[p.id + i] = true; this.persist(); this.updateHud(); this.renderDrawer(); }
             catch (x) { this.toast((x && x.message) || 'That hint could not be fetched.'); if (x && x.status === 402) { await this.refreshState(); this.renderDrawer(); } }
           });
         };
@@ -497,8 +485,8 @@ export class Engine {
     const g = m.el.querySelector('[data-id="invgrid"]');
     if (!this.game.inv.length) { const e = document.createElement('p'); e.className = 'inv-empty'; e.textContent = 'Nothing yet. Your pockets are as empty as your memory.'; g.appendChild(e); }
     this.game.inv.forEach(id => {
-      const it = ITEMS[id]; const card = document.createElement('div'); card.className = 'inv-card';
-      const nm = document.createElement('div'); nm.className = 'nm'; const i = document.createElement('i'); i.style.background = PAL[it.color]; nm.append(i, document.createTextNode(this.itemLabel(id)));
+      const it = this.D.ITEMS[id]; const card = document.createElement('div'); card.className = 'inv-card';
+      const nm = document.createElement('div'); nm.className = 'nm'; const i = document.createElement('i'); i.style.background = this.D.PAL[it.color]; nm.append(i, document.createTextNode(this.itemLabel(id)));
       const ds = document.createElement('div'); ds.className = 'ds'; ds.textContent = this.script.itemLook(id);
       const acts = document.createElement('div'); acts.className = 'acts';
       const use = document.createElement('button'); use.type = 'button'; use.className = 'btn'; use.textContent = 'Use on…'; use.onclick = () => { this.selItem = id; m.close(); this.renderInv(); this.renderVerbs(); };

@@ -1,0 +1,83 @@
+[
+  {
+    "name": "full-run-deck-officer",
+    "status": "pass",
+    "ms": 156858,
+    "notes": [
+      "score 250/250, hints 0, margin 232s, actions 113"
+    ],
+    "errors": []
+  },
+  {
+    "name": "full-run-with-hints",
+    "status": "pass",
+    "ms": 159048,
+    "notes": [
+      "score 247/250 with the \"Wim\" answer, hints used 2, margin 231s"
+    ],
+    "errors": []
+  },
+  {
+    "name": "free-player-paywall-and-denied-hints",
+    "status": "pass",
+    "ms": 21191,
+    "notes": [
+      "paywall shown, checkout refused by fixture, entitlements unchanged, paywall persists on reload"
+    ],
+    "errors": []
+  },
+  {
+    "name": "deaths-retry-restart",
+    "status": "pass",
+    "ms": 451858,
+    "notes": [
+      "deaths verified: cage-bottle, shelf-collapse, fire-cabinet-alarm, main-door, lick-hose, sweep, hot-duct, corridor-door, thistle-tomato, ilse-hears, ilse-turns, airlock-no-suit, lead-glass, ilse-returns, unclipped, keypad-wrench, cargo-drone, precedent, dorrit-tablet, door-seals, brack-reaches-you, clock"
+    ],
+    "errors": []
+  },
+  {
+    "name": "chapter-presets",
+    "status": "pass",
+    "ms": 143186,
+    "notes": [
+      "presets 2–8 seeded as saves and completed"
+    ],
+    "errors": []
+  },
+  {
+    "name": "save-failure-visible",
+    "status": "pass",
+    "ms": 3052,
+    "notes": [
+      "failed save shows \"Save failed\" + Retry; retry succeeds and persists"
+    ],
+    "errors": []
+  },
+  {
+    "name": "account-change",
+    "status": "pass",
+    "ms": 25002,
+    "notes": [
+      "signed-out state hands control back to host (onExit) or shows the gate: onExit"
+    ],
+    "errors": []
+  },
+  {
+    "name": "mobile-layouts",
+    "status": "pass",
+    "ms": 7094,
+    "notes": [
+      "portrait rotate prompt, landscape side actions, Type + Items sheets, tap-to-use on canvas"
+    ],
+    "errors": []
+  },
+  {
+    "name": "mount-unmount-and-clicks",
+    "status": "pass",
+    "ms": 8421,
+    "notes": [
+      "verb clicks, item-on-hotspot clicks, unmount/remount"
+    ],
+    "errors": []
+  }
+]
