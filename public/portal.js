@@ -10,7 +10,7 @@ function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s
 export const host=createPortLuckyHost({container:$('gameMount'),mount,signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}});
 function showCatalogue(){document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
 async function startGame(){try{await refreshMe();if(!account?.verified)return signIn();document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;await host.start();}catch(e){toast(e.message);await host.stop();showCatalogue();}}
-async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:c.catalog});}
+async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:me.catalog || c.catalog});}
 $('playHero').onclick=startGame;$('playCard').onclick=startGame;
 $('logoBtn').onclick=async()=>{await host.stop();showCatalogue();};
 $('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame();};

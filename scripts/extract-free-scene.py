@@ -12,6 +12,7 @@ assert 'function suiteAct' in part(859,934)
 assert 'function drawGarageBg' in part(737,754)
 css = '\n'.join(block.split('</style>')[0] for block in s.split('<style>')[1:])
 css = css.replace(':root', '.demo-shell').replace('body', '.demo-shell').replace('html', '.demo-shell')
+css += '\n.btn:disabled, .btn:disabled:hover, .btn:disabled:active { background: #302c38; color: #aaa4b5; border-color: #625a70; box-shadow: none; transform: none; cursor: not-allowed; }\n'
 html = part(443,496).replace(' id="gameView" hidden', ' id="gameView"')
 html = html.replace('<button class="btn small ghost" id="reloadSave">Load server progress (discard pending)</button>', '')
 head = '''// Extracted from the accepted frozen Scene 1 (c508239); see scripts/extract-free-scene.py.
@@ -88,8 +89,11 @@ function restartScene(){game=newGame();game.started=true;msgQueue=[];walkTarget=
 }
 '''
 code += part(1255,1268).replace("<p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Your progress is saved.</p>", "<p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Check the save status above before leaving.</p>")
+code=code.replace('function showPaywall() {', "function showPaywall() {\n  const canBuy = !!catalog[SKU_GAME]?.sale_enabled;")
+code=code.replace('One-time purchase. Secure card payment by Stripe.', "${canBuy ? 'One-time purchase. Secure card payment by Stripe.' : 'Purchases are currently unavailable for this account. You can return to games or replay the free scene.'}")
+code=code.replace('data-a="buy">Unlock full game', 'data-a="buy">${canBuy ? \'Unlock full game\' : \'Purchase unavailable\'}')
 code=code.replace("() => checkout('game')", "() => adapter.checkout(SKU_GAME).catch(e=>toast(e.message))")
-code=code.replace("o.querySelector('[data-a=buy]').focus();", "o.querySelector('[data-a=buy]').disabled=!catalog[SKU_GAME]?.sale_enabled; o.querySelector('[data-a=back]').focus();")
+code=code.replace("o.querySelector('[data-a=buy]').focus();", "o.querySelector('[data-a=buy]').disabled=!canBuy; o.querySelector('[data-a=back]').focus();")
 code += part(1279,1289) + part(1379,1399) + part(1514,1530)
 code += '''$('stuckTab').onclick=openDrawer;
 $('retrySave').onclick=()=>saveNow().catch(e=>toast(e.message));

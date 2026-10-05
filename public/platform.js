@@ -27,7 +27,7 @@ export function createPlatform({ requestSignIn: signIn, requestPurchase: purchas
   async saveGame(gameId,envelope) {const r=await api('PUT','/api/save',{game_id:gameId,...envelope},true); if(r.acknowledged!==true) throw new Error('Save was not acknowledged'); return {acknowledged:true,revision:r.revision};},
   async getRevealedHints(gameId) {return (await api('GET','/api/hints?game='+encodeURIComponent(gameId),undefined,true)).revealed;},
   async revealHint(gameId,puzzleId,level) {return api('POST','/api/hint',{game_id:gameId,puzzle_id:puzzleId,level},true);},
-  async getCatalog() {return (await api('GET','/api/config')).catalog;}
+  async getCatalog() {const me=await api('GET','/api/me',undefined,true);return me.catalog || (await api('GET','/api/config')).catalog;}
  });
 }
 // Additive lifecycle helper; destroy before remount on identity/access changes.

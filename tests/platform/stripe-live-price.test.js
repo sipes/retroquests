@@ -26,8 +26,16 @@ function setup(t) {
   return {env,user,requests,completed,setPrice:(p,s=200)=>{priceOverride=p;priceStatus=s;}};
 }
 
-test('verified catalogue prices preserve pending records, metadata, same-game dependency and signed ownership',async t=>{
+test('verified Sipes allowlist checkout preserves pending records, metadata, same-game dependency and signed ownership',async t=>{
   const {env,user,requests,completed}=setup(t);
+  env.SALES_TEST_EMAILS=' , CP@Strategico.co.za, ';
+  env.DB.db.prepare('UPDATE users SET email=? WHERE id=?').run('cp@strategico.co.za',user.id);
+  const config=await (await call(env,'/api/config',{token:user.token})).json();
+  assert.equal(config.saleEnabled,false);assert.equal(config.catalog['port-lucky'].sale_enabled,false);
+  const me=await (await call(env,'/api/me',{token:user.token})).json();
+  assert.equal(me.catalog['port-lucky'].sale_enabled,true);
+  assert.equal(JSON.stringify(config).toLowerCase().includes('strategico'),false);
+  assert.equal(Object.hasOwn(me,'SALES_TEST_EMAILS'),false);
   assert.equal((await call(env,'/api/checkout',{method:'POST',token:user.token,data:{sku:'port-lucky-walkthrough'}})).status,409);
   assert.equal(requests.length,0);
   for(const [sku,id,amount] of [['port-lucky','price_Game',799],['port-lucky-walkthrough','price_Hints',199]]) {
@@ -51,6 +59,39 @@ test('verified catalogue prices preserve pending records, metadata, same-game de
   assert.equal(env.DB.db.prepare('SELECT count(*) n FROM entitlement_contributions').get().n,2);
   const other=seed(env,{email:'other@example.test'});
   assert.deepEqual((await (await call(env,'/api/me',{token:other.token})).json()).entitlements,[]);
+});
+
+test('restricted sales reject anonymous, unverified, nonallowlisted and empty lists without provider calls or pending rows',async t=>{
+  const {env,requests}=setup(t);
+  const sipes=seed(env,{email:' CP@STRATEGICO.CO.ZA '});
+  const other=seed(env,{email:'other@example.test'});
+  const unverified=seed(env,{email:'cp@strategico.co.za',verified:false});
+  env.SALES_TEST_EMAILS='cp@strategico.co.za';
+  for(const [token,status] of [[undefined,401],[other.token,503],[unverified.token,503]]) {
+    assert.equal((await call(env,'/api/checkout',{method:'POST',token,data:{sku:'port-lucky'}})).status,status);
+    if(token)assert.equal((await (await call(env,'/api/me',{token})).json()).catalog['port-lucky'].sale_enabled,false);
+  }
+  assert.equal((await (await call(env,'/api/me',{token:sipes.token})).json()).catalog['port-lucky'].sale_enabled,true);
+  for(const value of ['', ' , , ',null,undefined]) {
+    env.SALES_TEST_EMAILS=value;
+    assert.equal((await call(env,'/api/checkout',{method:'POST',token:sipes.token,data:{sku:'port-lucky'}})).status,503);
+    assert.equal((await (await call(env,'/api/me',{token:sipes.token})).json()).catalog['port-lucky'].sale_enabled,false);
+  }
+  env.SALES_TEST_EMAILS='cp@strategico.co.za';
+  for(const [key,value] of [['CONTENT_APPROVED','0'],['PROVIDER_APPROVED','0'],['RELEASE_APPROVED','0'],['STRIPE_SECRET_KEY',''],['STRIPE_WEBHOOK_SECRET',''],['CURRENCY','eur'],['STRIPE_AUTOMATIC_TAX','1']]) {
+    const before=env[key];env[key]=value;
+    for(const token of [sipes.token,other.token,unverified.token]) {
+      assert.equal((await call(env,'/api/checkout',{method:'POST',token,data:{sku:'port-lucky'}})).status,503);
+      assert.equal((await (await call(env,'/api/me',{token})).json()).catalog['port-lucky'].sale_enabled,false);
+    }
+    env[key]=before;
+  }
+  assert.equal(requests.length,0);
+  assert.equal(env.DB.db.prepare('SELECT count(*) n FROM purchases').get().n,0);
+  delete env.SALES_TEST_EMAILS;
+  assert.equal((await (await call(env,'/api/config')).json()).saleEnabled,true);
+  assert.equal((await call(env,'/api/checkout',{method:'POST',token:other.token,data:{sku:'port-lucky'}})).status,200);
+  assert.equal(requests.length,2);
 });
 
 test('invalid configured prices fail closed before session creation or pending purchase',async t=>{

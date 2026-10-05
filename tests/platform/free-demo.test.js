@@ -3,12 +3,36 @@ import {readFileSync,readdirSync} from 'node:fs';import {execFileSync} from 'nod
 import {createPortLuckyAdapter,mountManaged} from '../../public/port-lucky-platform.js';
 import {validDemoSave} from '../../public/demos/port-lucky/save.js';
 import {fixture,seed,call} from './helpers.js';
+import {runInNewContext} from 'node:vm';
 const fresh=()=>({room:'suite',inv:[],flags:{},score:0,scored:{},revealed:{},hintsUsed:0,px:150,py:160});
 test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no paid content/imports/hints',()=>{
  const old=execFileSync('git',['show','c508239:public/index.html'],{encoding:'utf8'}),demo=readFileSync('public/demos/port-lucky/game.js','utf8');
  for(const [start,end] of [['function drawSuiteBg','/* ---------- Drawing: Garage'],['function suiteAct','function leaveSuite']])assert.ok(demo.includes(old.slice(old.indexOf(start),old.indexOf(end))));
  assert.doesNotMatch(demo,/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
  for(const file of readdirSync('public/games/port-lucky'))assert.deepEqual(readFileSync('public/games/port-lucky/'+file),execFileSync('git',['show','ecae4de:public/games/port-lucky/'+file]));
+});
+test('generated free-demo paywall truthfully labels available and disabled purchase states',()=>{
+ const demo=readFileSync('public/demos/port-lucky/game.js','utf8');
+ const css=JSON.parse(demo.split('\n')[0].slice('const CSS='.length,-1));
+ assert.match(css,/\.btn:disabled, \.btn:disabled:hover, \.btn:disabled:active \{[^}]*box-shadow: none;[^}]*cursor: not-allowed/);
+ const paywall=demo.slice(demo.indexOf('function showPaywall()'),demo.indexOf('function modal('));
+ for(const enabled of [false,true]) {
+  const buy={},back={focus(){this.focused=true;}};let html,checkouts=0;
+  runInNewContext(paywall+'showPaywall();',{catalog:{'port-lucky':{sale_enabled:enabled}},SKU_GAME:'port-lucky',document:{querySelectorAll:()=>[]},overlay:s=>{html=s;return {querySelector:s=>s.includes('buy')?buy:back};},price:()=>'$7.99',adapter:{checkout:async()=>{checkouts++;}},toast(){}});
+  assert.equal(buy.disabled,!enabled);assert.equal(back.focused,true);assert.equal(checkouts,0);
+  assert.match(html,enabled?/Unlock full game/:/Purchase unavailable/);
+  assert.match(html,enabled?/Secure card payment by Stripe/:/Purchases are currently unavailable for this account/);
+  if(!enabled)assert.doesNotMatch(html,/Secure card payment by Stripe/);
+ }
+});
+test('free-demo extraction is reproducible',()=>{
+ const before=readFileSync('public/demos/port-lucky/game.js');
+ execFileSync('python3',['scripts/extract-free-scene.py']);
+ assert.deepEqual(readFileSync('public/demos/port-lucky/game.js'),before);
+});
+test('bridge uses signed-in catalog rather than anonymous rollout-disabled catalog',async()=>{
+ const catalog={'port-lucky':{sale_enabled:true}},b=createPortLuckyAdapter({fetch:async p=>Response.json(p==='/api/me'?{user:{id:'sipes',verified:true},entitlements:[],catalog}:{catalog:{'port-lucky':{sale_enabled:false}}})});
+ assert.deepEqual((await b.refresh()).catalog,catalog);b.dispose();
 });
 test('free saves resume and use CAS without loading protected module, reject unsafe saves and retain server progress',async()=>{
  let me={user:{id:'free',verified:true},entitlements:[],save_envelopes:{'port-lucky':{version:1,revision:7,data:fresh()}}},writes=[];

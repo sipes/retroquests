@@ -108,10 +108,17 @@ function sessionCookie(url, token, maxAge) {
 function isAdminEmail(env, email) {
   return String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean).includes(email);
 }
-function publicCatalog(env = {}) {
-  return Object.fromEntries(Object.entries(CATALOG).map(([sku, p]) => [sku, { name: p.name, price_cents: p.price_cents, currency: 'usd', display_price: new Intl.NumberFormat('en-US', {style:'currency',currency:'USD'}).format(p.price_cents/100), sale_enabled: saleEnabled(env), game: p.game, requires: p.requires || null }]));
+function publicCatalog(env = {}, user = null) {
+  return Object.fromEntries(Object.entries(CATALOG).map(([sku, p]) => [sku, { name: p.name, price_cents: p.price_cents, currency: 'usd', display_price: new Intl.NumberFormat('en-US', {style:'currency',currency:'USD'}).format(p.price_cents/100), sale_enabled: saleEnabled(env, user), game: p.game, requires: p.requires || null }]));
 }
-function saleEnabled(env) { return env.CONTENT_APPROVED === '1' && env.PROVIDER_APPROVED === '1' && env.RELEASE_APPROVED === '1' && !!env.STRIPE_SECRET_KEY && !!env.STRIPE_WEBHOOK_SECRET && (env.CURRENCY || 'usd') === 'usd' && env.STRIPE_AUTOMATIC_TAX !== '1'; }
+function saleEnabled(env, user = null) {
+  const approved = env.CONTENT_APPROVED === '1' && env.PROVIDER_APPROVED === '1' && env.RELEASE_APPROVED === '1' && !!env.STRIPE_SECRET_KEY && !!env.STRIPE_WEBHOOK_SECRET && (env.CURRENCY || 'usd') === 'usd' && env.STRIPE_AUTOMATIC_TAX !== '1';
+  if (!approved) return false;
+  // An absent restriction preserves the existing policy; an explicitly empty one closes sales.
+  if (!Object.hasOwn(env, 'SALES_TEST_EMAILS')) return true;
+  const allowed = String(env.SALES_TEST_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  return !!user?.verified_at && allowed.includes(String(user.email || '').trim().toLowerCase());
+}
 function isLoopback(url) { return ['localhost','127.0.0.1','[::1]'].includes(url.hostname); }
 function secureResponse(res, url) {
   const h = new Headers(res.headers);
@@ -177,7 +184,7 @@ async function me(req, env) {
   const saveMap = {};
   const envelopes = {};
   for (const s of saves.results) { try { saveMap[s.game_id] = JSON.parse(s.data); envelopes[s.game_id] = {version:s.version,data:saveMap[s.game_id],revision:s.revision}; } catch {} }
-  return json({ user: userOut(u, env), entitlements: ents, saves: saveMap, save_envelopes: envelopes });
+  return json({ user: userOut(u, env), entitlements: ents, saves: saveMap, save_envelopes: envelopes, catalog: publicCatalog(env, u) });
 }
 
 async function signup(req, env, url) {
@@ -313,7 +320,7 @@ async function checkout(req, env, url) {
   if (owned.includes(sku)) throw new HttpError(409, 'You already own this.');
   if (product.requires && !owned.includes(product.requires)) throw new HttpError(409, `Buy ${CATALOG[product.requires].name} first.`);
 
-  if (!u.verified_at || !saleEnabled(env)) throw new HttpError(503, 'Sales are disabled pending content, provider and release approval.');
+  if (!u.verified_at || !saleEnabled(env, u)) throw new HttpError(503, 'Sales are currently unavailable for this account.');
   await limit(env,'checkout',u.id,10,3600);
 
   const session = await createCheckout(env, {

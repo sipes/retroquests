@@ -63,7 +63,7 @@ export function createPortLuckyAdapter({fetch:fetcher=(...args)=>globalThis.fetc
   if(envelope && owned && !ROOMS) await loadOwnedGame();
   if(envelope && (envelope.version!==1 || !Number.isSafeInteger(envelope.revision) || envelope.revision<0 || !(owned?validSave(envelope.data):validDemoSave(envelope.data)))){saveBlocked=true;throw new Error('Unsupported or invalid save retained. No automatic reset; contact the platform owner.');}
   if(!initialized){revision=envelope?.revision || 0; initialized=true;}
-  state={user:me.user || null,entitlements:me.entitlements || [],save:envelope?(owned?envelope.data:demoSave(envelope.data)):null,catalog:config.catalog || {}};
+  state={user:me.user || null,entitlements:me.entitlements || [],save:envelope?(owned?envelope.data:demoSave(envelope.data)):null,catalog:me.catalog || config.catalog || {}};
   onState?.(structuredClone(state)); return structuredClone(state);
  }
  async function guarded(fn) {
