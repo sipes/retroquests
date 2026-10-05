@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "retroquests-payment-sandbox",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./staging/payment-assets/",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "retroquests-payment-sandbox-db",
+    "database_id": "REPLACE_WITH_APPROVED_ISOLATED_SANDBOX_DATABASE_ID",
+    "migrations_dir": "migrations"
+  }],
+  "vars": {
+    "SITE_NAME": "Retro Quests payment sandbox",
+    "CURRENCY": "usd",
+    "STRIPE_AUTOMATIC_TAX": "0",
+    "DEV_MODE": "0",
+    "CONTENT_APPROVED": "0",
+    "PROVIDER_APPROVED": "0",
+    "RELEASE_APPROVED": "0"
+  }
+}
