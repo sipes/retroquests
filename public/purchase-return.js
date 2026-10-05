@@ -3,7 +3,8 @@ export function createPurchaseReturn({read,resume,status,wait=ms=>new Promise(r=
  let task=null,running=false;
  async function check(result,sku){
   if(result!=='success'){status({text:result==='cancelled'?'Checkout cancelled. No purchase was confirmed. You can play or resume using your current account access.':'Unrecognized checkout return. No purchase was confirmed. You can play or resume using your current account access.',play:true});return;}
-  if(!['port-lucky','port-lucky-walkthrough'].includes(sku)){status({text:'Unknown purchase return. No access was changed.',play:true});return;}
+  if(!['port-lucky','port-lucky-walkthrough','mop-galaxy','mop-galaxy-walkthrough'].includes(sku)){status({text:'Unknown purchase return. No access was changed.',play:true});return;}
+  const gameId=sku.replace(/-walkthrough$/,''),title=gameId==='mop-galaxy'?'Mop & Galaxy':'Port Lucky';
   status({text:'Checking server ownership. A checkout return is not proof of payment.'});
   let owner=null;
   for(let attempt=0;attempt<=delays.length;attempt++){
@@ -13,9 +14,9 @@ export function createPurchaseReturn({read,resume,status,wait=ms=>new Promise(r=
    if(owner!==null && owner!==s.user.id){status({text:'The signed-in account changed. No game was resumed. Check ownership on the account used at checkout.',retry:true,play:true});return;}
    owner=s.user.id;
    if(s.entitlements.includes(sku)){
-    if(sku==='port-lucky-walkthrough'){status({text:'Walkthrough ownership confirmed for this account. Play or resume Port Lucky to use it; full-game access is separate.',play:true});return;}
+    if(sku.endsWith('-walkthrough')){status({text:'Walkthrough ownership confirmed for this account. Play or resume '+title+' to use it; full-game access is separate.',play:true});return;}
     status({text:'Game ownership confirmed. Resuming your server save…'});
-    try{await resume(s);status({text:'Game ownership confirmed. You can play or resume your saved game.',play:true});}
+    try{await resume(s,gameId);status({text:'Game ownership confirmed. You can play or resume your saved game.',play:true});}
     catch{status({text:'Ownership was confirmed, but the game could not resume. Your server save has not been reset. Try Play / resume.',play:true});}
     return;
    }

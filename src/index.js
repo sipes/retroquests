@@ -11,6 +11,12 @@ const SESSION_DAYS = 180;
 const LOGIN_LINK_MINUTES = 30;
 const EMAIL_COOLDOWN_SECONDS = 60;
 const MAX_SAVE_BYTES = 64 * 1024;
+// Mop's supplier engine/primitives are copied into its own protected namespace;
+// Port Lucky keeps its existing runtime. No cross-game/shared asset route.
+const GAME_ASSETS = {
+  'port-lucky': new Set(['art.js','data.js','engine.js','game.css','game.js','rooms.js','script.js','template.js']),
+  'mop-galaxy': new Set(['art.js','data.js','engine.js','game.css','game.js','pixels.js','rooms.js','script.js','template.js'])
+};
 
 export default {
   async fetch(request, env, ctx) {
@@ -35,9 +41,11 @@ async function route(req, env, ctx, url) {
   // Gate before the static-assets binding; unknown/private paths never fall back.
   if (/^\/(?:__uat|tests|src|dev|scripts|evidence|\.git|\.env)(?:\/|$)/.test(p) || /\.(?:map|sql|sqlite|env)$/.test(p)) return json({error:'Not found'},404);
   if (p.startsWith('/games/')) {
-    if (!p.startsWith('/games/port-lucky/')) return json({error:'Not found'},404);
+    const asset = p.match(/^\/games\/(port-lucky|mop-galaxy)\/([a-z0-9-]+\.(?:js|css))$/);
+    if (!asset || !GAME_ASSETS[asset[1]].has(asset[2])) return json({error:'Not found'},404);
     const u = await requireUser(req,env);
-    if (!u.verified_at || !(await entitlementsFor(env,u.id)).includes('port-lucky')) throw new HttpError(402,'The full game requires a verified account and game ownership.');
+    const owned = await entitlementsFor(env,u.id);
+    if (!u.verified_at || !owned.includes(asset[1])) throw new HttpError(402,'The full game requires a verified account and game ownership.');
     return env.ASSETS.fetch(req);
   }
   if (!p.startsWith('/api/') && !p.startsWith('/auth/')) return null;
@@ -166,7 +174,12 @@ async function requireUser(req, env) {
 }
 async function entitlementsFor(env, userId) {
   const { results } = await env.DB.prepare('SELECT sku FROM entitlements WHERE user_id = ?').bind(userId).all();
-  return results.map(r => r.sku);
+  return effectiveEntitlements(results.map(r => r.sku));
+}
+// The legacy D1 view knows only Port Lucky's dependency. Apply the catalogue
+// dependency to every game here, without changing or replacing its migrations.
+function effectiveEntitlements(skus) {
+  return skus.filter(sku => Object.hasOwn(CATALOG, sku) && (!CATALOG[sku].requires || skus.includes(CATALOG[sku].requires)));
 }
 function userOut(u, env) {
   return { id: u.id, email: u.email, name: u.name, verified: !!u.verified_at, isAdmin: !!u.verified_at && isAdminEmail(env, u.email) };
@@ -292,6 +305,30 @@ async function deleteAccount(req, env) {
 }
 
 // ---------- Saves ----------
+// Supplier scene 1 is BOTH closet and deck9 (20 points). No paid progress,
+// hint text, extra fields or nested paid checkpoint can enter a free snapshot.
+const MOP_FREE_ITEMS = new Set(['mop','mymop','badge','coin','snakpak','wrapper','wrench','granules']);
+const MOP_FREE_FLAGS = new Set(['lookedArm','gotBadge','sawBoarders','sawWrench','shelfWedged','gotWrench','vended','grilleOpen','mopChuted','tookMymop','leftDeck9']);
+const MOP_FREE_POINTS = {'look-arm':1,badge:2,vent:3,'shelf-look':1,'coin-vend':2,wrench:3,bolts:3,'mop-chute':3,climb:2};
+const MOP_FREE_FIELDS = new Set(['v','ownerId','chapter','room','inv','flags','scored','score','hintsUsed','revealed','px','py','dir','started','clock','checkpoint','done']);
+const plainObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+const flagValue = v => typeof v === 'boolean' || v === 0 || v === 1;
+function validMopFreeSave(s, ownerId, depth = 0) {
+  if (!plainObject(s) || Object.keys(s).some(k => !MOP_FREE_FIELDS.has(k)) ||
+      (s.ownerId !== undefined && s.ownerId !== ownerId) ||
+      s.v !== 2 || s.chapter !== 1 ||
+      !['closet','deck9'].includes(s.room) || !Array.isArray(s.inv) ||
+      s.inv.some(id => !MOP_FREE_ITEMS.has(id)) || new Set(s.inv).size !== s.inv.length ||
+      !plainObject(s.flags) || Object.entries(s.flags).some(([k,v]) => !MOP_FREE_FLAGS.has(k) || !flagValue(v)) ||
+      !Number.isInteger(s.score) || s.score < 0 || s.score > 20 ||
+      !plainObject(s.scored) || Object.entries(s.scored).some(([k,v]) => !Object.hasOwn(MOP_FREE_POINTS,k) || !flagValue(v)) ||
+      s.score !== Object.entries(s.scored).reduce((total,[key,value]) => total + (value ? MOP_FREE_POINTS[key] : 0),0) ||
+      !plainObject(s.revealed) || Object.keys(s.revealed).length || s.hintsUsed !== 0 ||
+      ['px','py'].some(k => !Number.isFinite(s[k]) || s[k] < 0 || s[k] > (k === 'px' ? 320 : 180)) ||
+      (s.dir !== 1 && s.dir !== -1) || typeof s.started !== 'boolean' ||
+      s.done !== false || s.clock !== null) return false;
+  return s.checkpoint === undefined || s.checkpoint === null || (depth === 0 && validMopFreeSave(s.checkpoint, ownerId, 1));
+}
 async function putSave(req, env) {
   const u = await requireUser(req, env);
   const raw = await req.text();
@@ -300,7 +337,13 @@ async function putSave(req, env) {
   if(!b || b.version !== 1 || !Number.isSafeInteger(b.revision) || b.revision < 0 || !b.data || typeof b.data !== 'object' || Array.isArray(b.data)) throw new HttpError(400,'Save version 1, object data and a CAS revision are required.');
   if ((b.ownerId !== undefined && b.ownerId !== u.id) || (b.data.ownerId !== undefined && b.data.ownerId !== u.id)) throw new HttpError(409, 'Save owner does not match the signed-in user.');
   const gameId = String(b.game_id || '');
-  if (!GAMES[gameId]) throw new HttpError(400, 'Unknown game.');
+  if (!Object.hasOwn(GAMES,gameId)) throw new HttpError(400, 'Unknown game.');
+  if (gameId === 'mop-galaxy') {
+    if (!u.verified_at) throw new HttpError(403, 'Verify your account before saving.');
+    if (b.data.checkpoint?.ownerId !== undefined && b.data.checkpoint.ownerId !== u.id) throw new HttpError(409, 'Save owner does not match the signed-in user.');
+    const owned = await entitlementsFor(env,u.id);
+    if (!owned.includes(gameId) && !validMopFreeSave(b.data,u.id)) throw new HttpError(400, 'Save is outside the free scene boundary. Server progress was not changed.');
+  }
   await limit(env,'save',u.id,120,60);
   const row = await env.DB.prepare('INSERT INTO saves(user_id,game_id,data,updated_at,version,revision) SELECT ?,?,?,?,1,1 WHERE ?=0 ON CONFLICT(user_id,game_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at,version=1,revision=saves.revision+1 WHERE saves.revision=? RETURNING revision').bind(u.id,gameId,JSON.stringify(b.data),now(),b.revision,b.revision).first();
   // INSERT SELECT above only inserts revision 0; existing saves use an atomic UPDATE.
@@ -313,8 +356,9 @@ async function putSave(req, env) {
 async function checkout(req, env, url) {
   const u = await requireUser(req, env);
   const b = await body(req);
+  if (b.ownerId !== undefined && b.ownerId !== u.id) throw new HttpError(409, 'Checkout owner does not match the signed-in user.');
   const sku = String(b.sku || '');
-  const product = CATALOG[sku];
+  const product = Object.hasOwn(CATALOG,sku) ? CATALOG[sku] : null;
   if (!product) throw new HttpError(400, 'Unknown product.');
   const owned = await entitlementsFor(env, u.id);
   if (owned.includes(sku)) throw new HttpError(409, 'You already own this.');
@@ -326,7 +370,7 @@ async function checkout(req, env, url) {
   const session = await createCheckout(env, {
     product, sku, user: u,
     successUrl: `${url.origin}/?purchase=success&sku=${encodeURIComponent(sku)}`,
-    cancelUrl: `${url.origin}/?purchase=cancelled`
+    cancelUrl: `${url.origin}/?purchase=cancelled&sku=${encodeURIComponent(sku)}`
   });
   await env.DB.prepare('INSERT INTO purchases (id, user_id, sku, amount_cents, currency, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(session.id, u.id, sku, product.price_cents, env.CURRENCY || 'usd', 'pending', now()).run();
@@ -347,7 +391,8 @@ async function stripeWebhook(req, env) {
   const stmts=[env.DB.prepare('INSERT OR IGNORE INTO stripe_events(id,type,received_at,claim_key) VALUES(?,?,?,?)').bind(event.id,event.type,n,key)];
   if(['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(event.type) && obj.payment_status==='paid') {
     const p=await env.DB.prepare('SELECT * FROM purchases WHERE id=?').bind(obj.id).first();
-    const md=obj.metadata || {}, product=CATALOG[md.sku];
+    const md=obj.metadata || {}, product=Object.hasOwn(CATALOG,md.sku) ? CATALOG[md.sku] : null;
+    if (product && ((product.game === 'mop-galaxy' && md.game_id !== product.game) || (md.game_id !== undefined && md.game_id !== product.game))) throw new HttpError(400,'Purchase game validation failed');
     if(!p || !product || (p.user_id!==null && md.user_id !== p.user_id) || md.sku!==p.sku || (obj.client_reference_id && p.user_id!==null && obj.client_reference_id!==p.user_id) || obj.amount_total!==product.price_cents || obj.amount_total!==p.amount_cents || obj.currency!=='usd' || p.currency!=='usd' || typeof obj.payment_intent!=='string' || !obj.payment_intent || (p.payment_intent && p.payment_intent!==obj.payment_intent)) throw new HttpError(400,'Purchase validation failed');
     const linked=await env.DB.prepare('SELECT id FROM purchases WHERE payment_intent=? AND id!=?').bind(obj.payment_intent,obj.id).first();
     if(linked) throw new HttpError(400,'Payment intent already linked');
@@ -382,11 +427,13 @@ async function dispatchReceipt(env,id) {
 async function revealHint(req, env) {
   const u = await requireUser(req, env);
   const b = await body(req);
-  const game = GAMES[String(b.game_id || '')];
+  const gameId = String(b.game_id || '');
+  const game = Object.hasOwn(GAMES,gameId) ? GAMES[gameId] : null;
   if (!game) throw new HttpError(400, 'Unknown game.');
   const owned = await entitlementsFor(env, u.id);
   if (!owned.includes(game.walkthroughSku)) throw new HttpError(402, 'The walkthrough add-on is needed for hints.');
-  const puzzle = game.puzzles[String(b.puzzle_id || '')];
+  const puzzleId = String(b.puzzle_id || '');
+  const puzzle = Object.hasOwn(game.puzzles,puzzleId) ? game.puzzles[puzzleId] : null;
   const level = Number(b.level);
   if (!puzzle || !Number.isInteger(level) || level < 0 || level >= puzzle.length) throw new HttpError(400, 'Unknown hint.');
   if (level > 0) {
@@ -400,7 +447,7 @@ async function revealHint(req, env) {
 async function listHints(req, env, url) {
   const u = await requireUser(req, env);
   const gameId = url.searchParams.get('game') || '';
-  const game = GAMES[gameId];
+  const game = Object.hasOwn(GAMES,gameId) ? GAMES[gameId] : null;
   if (!game) throw new HttpError(400, 'Unknown game.');
   const owned = await entitlementsFor(env, u.id);
   const { results } = await env.DB.prepare('SELECT puzzle_id, level FROM hint_reveals WHERE user_id = ? AND game_id = ? ORDER BY puzzle_id, level').bind(u.id, gameId).all();
@@ -439,7 +486,7 @@ async function admin(req, env, url) {
         (SELECT COALESCE(SUM(amount_cents),0) FROM purchases pp WHERE pp.user_id = u.id AND pp.status = 'paid') AS spent_cents
        FROM users u WHERE (? = '' OR lower(u.email) LIKE ? OR lower(u.name) LIKE ?) ORDER BY u.created_at DESC LIMIT 100`
     ).bind(q, like, like).all();
-    return json({ users: results });
+    return json({ users: results.map(user => ({...user, skus: user.skus ? effectiveEntitlements(user.skus.split(',')).join(',') || null : null})) });
   }
   const mm = p.match(/^\/users\/([0-9a-f-]{36})(\/[a-z-]+)?$/);
   if (mm) {
@@ -455,11 +502,12 @@ async function admin(req, env, url) {
         env.DB.prepare('SELECT game_id, updated_at, data FROM saves WHERE user_id = ?').bind(target.id).all()
       ]);
       const saves = save.results.map(s => { let d = {}; try { d = JSON.parse(s.data) || {}; } catch {} return { game_id: s.game_id, updated_at: s.updated_at, room: d.room, score: d.score }; });
-      return json({ user: { ...target, isAdmin: !!target.verified_at && isAdminEmail(env, target.email) }, entitlements: ents.results, purchases: purchases.results, emails: mails.results, hints: hints.n, saves });
+      const effective = effectiveEntitlements(ents.results.map(e => e.sku));
+      return json({ user: { ...target, isAdmin: !!target.verified_at && isAdminEmail(env, target.email) }, entitlements: ents.results.filter(e => effective.includes(e.sku)), purchases: purchases.results, emails: mails.results, hints: hints.n, saves });
     }
     if (action === '/grant' && m === 'POST') {
       const b = await body(req); const sku = String(b.sku || '');
-      if (!CATALOG[sku]) throw new HttpError(400, 'Unknown product.');
+      if (!Object.hasOwn(CATALOG,sku)) throw new HttpError(400, 'Unknown product.');
       const owned = await entitlementsFor(env,target.id);
       if(CATALOG[sku].requires && !owned.includes(CATALOG[sku].requires)) throw new HttpError(409,'Grant the base game first.');
       await env.DB.batch([
@@ -471,7 +519,7 @@ async function admin(req, env, url) {
     }
     if (action === '/revoke' && m === 'POST') {
       const b = await body(req); const sku = String(b.sku || '');
-      if(!CATALOG[sku]) throw new HttpError(400,'Unknown product.');
+      if(!Object.hasOwn(CATALOG,sku)) throw new HttpError(400,'Unknown product.');
       await env.DB.batch([
         env.DB.prepare('INSERT INTO access_revocations VALUES(?,?,?) ON CONFLICT(user_id,sku) DO UPDATE SET revoked_at=excluded.revoked_at').bind(target.id,sku,now()),
         env.DB.prepare('UPDATE entitlement_contributions SET revoked_at=? WHERE user_id=? AND sku=?').bind(now(),target.id,sku), audit(target.id,'revoke',sku)

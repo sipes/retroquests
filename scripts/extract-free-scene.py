@@ -1,9 +1,18 @@
-"""Reproduce the safe Scene 1 module from the accepted c508239 frozen source.
-No full-game module is read. Explicit slices exclude the paid garage and hints.
+"""Dispatch game-specific free-scene extraction (default: unchanged Port Lucky).
+The legacy Port Lucky path reads only the accepted c508239 frozen HTML.
+--game mop-galaxy delegates reviewed Scene 1 slices and read-only --check.
 """
 from pathlib import Path
-import subprocess, json
+import subprocess, json, argparse, sys
 root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description='Extract a game-specific free scene.')
+parser.add_argument('--game', choices=['port-lucky', 'mop-galaxy'], default='port-lucky')
+parser.add_argument('--check', action='store_true', help='read-only deterministic check (Mop only)')
+args = parser.parse_args()
+if args.game == 'mop-galaxy':
+    sys.exit(subprocess.call([sys.executable, str(root/'scripts/extract-mop-free-scene.py'), *(['--check'] if args.check else [])]))
+if args.check:
+    parser.error('--check currently requires --game mop-galaxy; legacy Port Lucky extraction is unchanged')
 s = subprocess.check_output(['git', 'show', 'c508239:public/index.html'], cwd=root, text=True)
 lines = s.splitlines(keepends=True)
 def part(a,b): return ''.join(lines[a-1:b])
@@ -25,7 +34,9 @@ export async function mount(container, adapter, options = {}) {
  const root = shell.attachShadow({mode:'open'});
  root.innerHTML = `<style>${CSS}</style><div class="demo-shell">${HTML}</div>`;
  const body=root.querySelector('.demo-shell');
- const listeners=[], timers=new Set(); let live=true, raf;
+ const listeners=[], timers=new Set(), pausedTimers=[]; let live=true, paused=false, raf, pendingFrame;
+ const blockPaused=e=>{if(paused){e.preventDefault();e.stopImmediatePropagation();}};
+ for(const type of ['click','submit','keydown','keyup','pointerdown','pointerup','touchstart','touchend'])root.addEventListener(type,blockPaused,true);
  const document = {
   body, documentElement: body,
   getElementById: id=>root.querySelector('#'+id),
@@ -41,9 +52,9 @@ export async function mount(container, adapter, options = {}) {
   addEventListener(type,fn,opts){globalThis.document.addEventListener(type,fn,opts);listeners.push([type,fn,opts]);},
   removeEventListener(...a){globalThis.document.removeEventListener(...a);}
  };
- const setTimeout=(fn,ms)=>{const id=globalThis.setTimeout(()=>{timers.delete(id);if(live)fn();},ms);timers.add(id);return id;};
+ const setTimeout=(fn,ms)=>{const id=globalThis.setTimeout(()=>{timers.delete(id);if(live){if(paused)pausedTimers.push(fn);else fn();}},ms);timers.add(id);return id;};
  const clearTimeout=id=>{timers.delete(id);globalThis.clearTimeout(id);};
- const requestAnimationFrame=fn=>{if(live)raf=globalThis.requestAnimationFrame(fn);};
+ const requestAnimationFrame=fn=>{pendingFrame=fn;if(live && !paused)raf=globalThis.requestAnimationFrame(t=>{if(!live || paused)return;pendingFrame=null;fn(t);});};
  const GAME_ID='port-lucky', SKU_GAME='port-lucky';
  const account=initial.user, catalog=initial.catalog || {};
  const price=sku=>catalog[sku]?.display_price || 'Unavailable';
@@ -99,8 +110,10 @@ code += '''$('stuckTab').onclick=openDrawer;
 $('retrySave').onclick=()=>saveNow().catch(e=>toast(e.message));
 const pagehide=()=>saveNow(true).catch(()=>{});window.addEventListener('pagehide',pagehide);
 startGame();if(initial.save)$('saveStatus').textContent='Loaded server progress';requestAnimationFrame(render);
-return {get state(){return structuredClone(game);}, refresh:()=>adapter.getState(),
- unmount(){if(disposed)return;disposed=true;exitImmersive();saveNow(true).catch(()=>{});live=false;globalThis.cancelAnimationFrame(raf);
+return {root:shell,get state(){return structuredClone(game);}, refresh:()=>adapter.getState(),
+ pause(){paused=true;globalThis.cancelAnimationFrame(raf);return ()=>{paused=false;if(!live)return;if(pendingFrame)requestAnimationFrame(pendingFrame);for(const fn of pausedTimers.splice(0))setTimeout(fn,0);};},
+ async flush(){clearTimeout(saveTimer);if(saving)await saving;while(pendingSave){await saveNow(false);if(saving)await saving;}},
+ unmount(){if(disposed)return;disposed=true;exitImmersive();live=false;globalThis.cancelAnimationFrame(raf);
  for(const id of timers)globalThis.clearTimeout(id);for(const args of listeners)globalThis.document.removeEventListener(...args);
  window.removeEventListener('pagehide',pagehide);root.querySelectorAll('[data-a="close"]').forEach(b=>b.click());root.replaceChildren();}
 };

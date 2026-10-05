@@ -12,7 +12,9 @@ function form(obj, prefix = '', out = new URLSearchParams()) {
 
 const PRICE_BINDINGS = {
   'port-lucky': 'STRIPE_PRICE_PORT_LUCKY',
-  'port-lucky-walkthrough': 'STRIPE_PRICE_PORT_LUCKY_WALKTHROUGH'
+  'port-lucky-walkthrough': 'STRIPE_PRICE_PORT_LUCKY_WALKTHROUGH',
+  'mop-galaxy': 'STRIPE_PRICE_MOP_GALAXY',
+  'mop-galaxy-walkthrough': 'STRIPE_PRICE_MOP_GALAXY_WALKTHROUGH'
 };
 const paymentError = () => Object.assign(new Error('The payment page could not be opened. Please try again.'), { status: 502 });
 
@@ -35,7 +37,8 @@ async function verifiedPrice(env, sku, product) {
       price.type !== 'one_time' || price.recurring != null || price.billing_scheme !== 'per_unit' ||
       price.custom_unit_amount != null || !['exclusive', 'unspecified'].includes(price.tax_behavior) ||
       !price.product || typeof price.product !== 'object' || price.product.deleted || price.product.active !== true ||
-      price.product.metadata?.application !== 'retroquests' || price.product.metadata?.sku !== sku) {
+      price.product.metadata?.application !== 'retroquests' || price.product.metadata?.sku !== sku ||
+      (price.product.metadata?.game_id !== undefined && price.product.metadata.game_id !== product.game)) {
     throw paymentError();
   }
   return id;
@@ -48,14 +51,14 @@ export async function createCheckout(env, { product, sku, user, successUrl, canc
     success_url: successUrl,
     cancel_url: cancelUrl,
     client_reference_id: user.id,
-    metadata: { user_id: user.id, sku },
-    payment_intent_data: { metadata: { user_id: user.id, sku } },
+    metadata: { user_id: user.id, sku, game_id: product.game },
+    payment_intent_data: { metadata: { user_id: user.id, sku, game_id: product.game } },
     line_items: { 0: {
       quantity: 1,
       price_data: {
         currency: 'usd',
         unit_amount: product.price_cents,
-        product_data: { name: product.name, description: product.description, metadata: { sku } },
+        product_data: { name: product.name, description: product.description, metadata: { sku, game_id: product.game } },
         tax_behavior: 'exclusive'
       }
     } },

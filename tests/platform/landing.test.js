@@ -14,7 +14,8 @@ test('landing identifies the arcade before the original featured adventure',()=>
 });
 test('landing has honest demo, development and planned SKU-specific pricing',()=>{
   assert.match(home,/Eight-chapter adventure/);assert.match(home,/full-game sales are not available yet/);assert.doesNotMatch(home,/Coming 2027|2–3 hours|release gates|processed securely/);
-  assert.equal((home.match(/<span class="tag">In development<\/span>/g)||[]).length,2);
+  assert.equal((home.match(/<span class="tag">In development<\/span>/g)||[]).length,1);
+  assert.match(home,/id="playMopCard">Play/);
   assert.match(home,/<button[^>]*id="buyHero" disabled>Full game · <span data-price="port-lucky">\$7\.99<\/span><\/button>/);
   assert.match(home,/data-price="port-lucky-walkthrough">\$1\.99/);
   assert.equal((home.match(/data-price="port-lucky"/g)||[]).length,1);

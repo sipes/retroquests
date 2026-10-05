@@ -1,33 +1,39 @@
 import {createPortLuckyHost,mountManaged as mount} from './port-lucky-platform.js';
+import {createMopGalaxyHost,mountManaged as mountMop} from './mop-galaxy-platform.js';
+import {ART as mopDemoArt,drawPlayer as drawWim} from './demos/mop-galaxy/art.js';
 import {drawLandingArt} from './landing-art.js';
 import {authProof} from './auth-proof.js';
 import {createPurchaseReturn} from './purchase-return.js';
 const $=id=>document.getElementById(id);
 const SKU_GAME='port-lucky',SKU_WALK='port-lucky-walkthrough';
 let account=null,ent={game:false,walk:false},catalog={};
+let selectedGame='port-lucky',allEntitlements=[];
 const escapeHtml=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(method,path,data){const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const out=await r.json();if(!r.ok)throw Object.assign(new Error(out.error || 'Request failed'),{status:r.status});return out;}
-function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,ent])!==JSON.stringify([s.user,next]);account=s.user;ent=next;catalog=s.catalog;if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
-export const host=createPortLuckyHost({container:$('gameMount'),mount,signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}});
+function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,allEntitlements])!==JSON.stringify([s.user,s.entitlements]);account=s.user;ent=next;allEntitlements=s.entitlements;catalog=s.catalog;if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
+const hostOptions={container:$('gameMount'),signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}};
+const hosts={'port-lucky':createPortLuckyHost({...hostOptions,mount}),'mop-galaxy':createMopGalaxyHost({...hostOptions,mount:mountMop})};
+export let host=hosts[selectedGame];
 function showCatalogue(){document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
 let starting=null;
-function startGame(expectedOwner){const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;starting=(async()=>{try{await refreshMe();if(guarded && (account?.id!==expectedOwner || !account?.verified || !ent.game))throw new Error('Account or game ownership changed. No automatic resume.');if(!account?.verified){await signIn();return false;}document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;$('saveRecovery').hidden=true;await host.start(guarded?expectedOwner:undefined);return true;}catch(e){toast(e.message);await host.stop();showCatalogue();return false;}})().finally(()=>{starting=null;});return starting;}
+function startGame(expectedOwner,gameId=selectedGame,{discardPending=false}={}){const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;starting=(async()=>{try{if(!Object.hasOwn(hosts,gameId))throw new Error('Unknown game');if(gameId!==selectedGame){await host.stop();selectedGame=gameId;host=hosts[gameId];}await refreshMe();if(guarded && (account?.id!==expectedOwner || !account?.verified || !allEntitlements.includes(gameId)))throw new Error('Account or game ownership changed. No automatic resume.');if(!account?.verified && gameId!=='mop-galaxy'){await signIn();return false;}document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;await host.start(guarded?expectedOwner:undefined,{discardPending});$('saveRecovery').hidden=true;return true;}catch(e){toast(e.message);if(host.handle){$('saveRecovery').hidden=false;return false;}await host.stop();showCatalogue();return false;}})().finally(()=>{starting=null;});return starting;}
 async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:me.catalog || c.catalog});return {user:me.user || null,entitlements:me.entitlements || []};}
-$('playHero').onclick=startGame;$('playCard').onclick=startGame;
-$('logoBtn').onclick=async()=>{await host.stop();showCatalogue();};
-$('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame();};
+$('playHero').onclick=()=>startGame(undefined,'port-lucky');$('playCard').onclick=()=>startGame(undefined,'port-lucky');$('playMopCard').onclick=()=>startGame(undefined,'mop-galaxy');
+$('logoBtn').onclick=async()=>{try{await host.stop();showCatalogue();}catch(e){toast(e.message);$('saveRecovery').hidden=false;}};
+$('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame(undefined,selectedGame,{discardPending:true});};
 drawLandingArt();
+{const c=$('cover2').getContext('2d'),s={flags:{},inv:['mop']};c.save();c.translate(0,-20);mopDemoArt.closet.bg(c,s);for(const p of mopDemoArt.closet.props(c,s,0))p.d();drawWim(c,236,160,-1,0);c.restore();}
 const query=new URLSearchParams(location.search);
 const purchaseResult=query.get('purchase'),purchaseSku=query.get('sku');
 function purchaseStatus({text,retry=false,play=false}){
  let panel=$('purchaseReturn');if(!panel){panel=document.createElement('section');panel.id='purchaseReturn';panel.className='overlay-card';panel.setAttribute('aria-label','Purchase return');$('home').prepend(panel);}
  panel.replaceChildren();const message=document.createElement('p');message.setAttribute('role','status');message.textContent=text;panel.append(message);
  if(retry){const b=document.createElement('button');b.className='btn';b.textContent='Check ownership again';b.onclick=()=>purchaseReturn.run(purchaseResult,purchaseSku,{retry:true});panel.append(b);}
- if(play){const b=document.createElement('button');b.className='btn ghost';b.textContent='Play / resume Port Lucky';b.onclick=()=>startGame();panel.append(b);}
+ if(play){const gameId=purchaseSku?.startsWith('mop-galaxy')?'mop-galaxy':'port-lucky';const b=document.createElement('button');b.className='btn ghost';b.textContent='Play / resume '+(gameId==='mop-galaxy'?'Mop & Galaxy':'Port Lucky');b.onclick=()=>startGame(undefined,gameId);panel.append(b);}
 }
-export const purchaseReturn=createPurchaseReturn({read:refreshMe,resume:async s=>{if(!await startGame(s.user.id))throw new Error('Resume failed');},status:purchaseStatus});
+export const purchaseReturn=createPurchaseReturn({read:refreshMe,resume:async(s,gameId)=>{if(!await startGame(s.user.id,gameId))throw new Error('Resume failed');},status:purchaseStatus});
 if(query.has('purchase') || query.has('signin'))history.replaceState(null,'',location.pathname);
-if(query.has('purchase')){purchaseReturn.run(purchaseResult,purchaseSku);if(purchaseResult!=='success' || ![SKU_GAME,SKU_WALK].includes(purchaseSku))refreshMe().catch(e=>toast(e.message));}
+if(query.has('purchase')){purchaseReturn.run(purchaseResult,purchaseSku);if(purchaseResult!=='success' || ![SKU_GAME,SKU_WALK,'mop-galaxy','mop-galaxy-walkthrough'].includes(purchaseSku))refreshMe().catch(e=>toast(e.message));}
 else refreshMe().catch(e=>toast(e.message));
 if(query.get('signin')==='expired')signIn();
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
@@ -95,7 +101,7 @@ function signIn() {
   });
   return promise;
 }
-async function checkout(key){try{if(host.adapter){await host.adapter.checkout(key==='walk'?SKU_WALK:SKU_GAME);return;}const r=await api('POST','/api/checkout',{sku:key==='walk'?SKU_WALK:SKU_GAME});const u=new URL(r.url);if(u.protocol!=='https:' || u.hostname!=='checkout.stripe.com')throw new Error('Invalid checkout URL');location.assign(u.href);}catch(e){toast(e.message);}}
+async function checkout(key){try{if(!host.adapter)throw new Error('Open the game before checkout.');await host.adapter.checkout(key==='walk'?SKU_WALK:SKU_GAME);}catch(e){toast(e.message);}}
 let toastT = null;
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
 
@@ -116,7 +122,9 @@ function renderMenu() {
   const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   m.innerHTML = `<div class="owned"><b>${esc(account.email)}</b>${account.verified ? '' : ' · not confirmed yet'}</div>
     <div class="owned">Port Lucky: <b>${ent.game ? 'full game' : 'scene 1 (free)'}</b></div>
-    <div class="owned">Walkthrough: <b>${ent.walk ? 'owned' : 'not owned'}</b></div>`;
+    <div class="owned">Port Lucky walkthrough: <b>${ent.walk ? 'owned' : 'not owned'}</b></div>
+    <div class="owned">Mop &amp; Galaxy: <b>${allEntitlements.includes('mop-galaxy') ? 'full game' : 'scene 1 (free)'}</b></div>
+    <div class="owned">Mop walkthrough: <b>${allEntitlements.includes('mop-galaxy-walkthrough') ? 'owned' : 'not owned'}</b></div>`;
   if (account.isAdmin) { const a = document.createElement('a'); a.className = 'btn small alt'; a.href = '/admin.html'; a.textContent = 'Admin'; a.style.textDecoration = 'none'; m.appendChild(a); }
   const out = document.createElement('button'); out.className = 'btn small ghost'; out.textContent = 'Sign out';
   out.onclick = async () => {try {await api('POST','/api/logout');await refreshMe();m.hidden=true;toast('Signed out. Unsaved in-memory progress cleared.');} catch(e){toast(e.message);} };
