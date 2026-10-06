@@ -169,7 +169,8 @@ await scenario('account-change', async entry => {
   const s = await Session.open(browser, { player: 'owner', name: 'account' }); await s.page.evaluate(async () => { const p=await import('/portal.js');await p.host.stop();await window.__plAdapter.__reset('owner');await window.__plAdapter.__reset('free'); }); await s.page.reload(); await s.page.waitForSelector('.pl-game');
   await wrap(s, async () => {
     await W.chapter1(s); await s.waitRoom('cryo'); await s.dismiss(); const owner = await s.state(); assert(owner.chapter === 2, 'owner in chapter 2'); await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));await s.page.waitForFunction(async () => { const sv = await window.__plAdapter.__readSave('owner'); return sv && sv.chapter === 2; }, null, { timeout: 5000 });
-    await s.setPlayer('free'); await s.page.waitForTimeout(600); await s.dismiss(); const free = await s.state(); assert(free && free.chapter === 1 && free.score === 0 && free.room === 'closet', 'free player starts fresh: ' + JSON.stringify([free && free.chapter, free && free.score]));
+    await s.setPlayer('free'); await s.page.waitForTimeout(600);assert(!await s.state(),'account change discards old mounted state');
+    await s.page.click('#playMopCard');await s.page.waitForSelector('.pl-game');await s.dismiss(); const free = await s.state(); assert(free && free.chapter === 1 && free.score === 0 && free.room === 'closet', 'free player starts fresh: ' + JSON.stringify([free && free.chapter, free && free.score]));
     await s.cmd('look at me'); await s.page.evaluate(()=>window.__plGame.engine.flushSave(false));await s.setPlayer('owner');await s.page.waitForFunction(()=>window.__plGame?.state?.chapter===2); await s.dismiss(); const back = await s.state(); assert(back.chapter === 2 && back.score === 20, 'owner progress intact after switching back: ' + JSON.stringify([back.chapter, back.score]));
     await s.setPlayer('anon'); await s.page.waitForTimeout(600); const gate = await s.page.$('.pl-game .pl-gate:not([hidden])'); entry.notes.push('signed-out state hands control back to host (onExit) or shows the gate: ' + (gate ? 'gate' : 'onExit'));
   }); await s.close();
@@ -182,7 +183,8 @@ await scenario('mobile-layouts', async entry => {
     const vis = await s.page.$eval('.pl-game .rotate-hint', e => getComputedStyle(e).display); assert(vis !== 'none', 'rotate hint visible in portrait'); await s.shot('portrait-rotate-hint');
     await s.page.click('.pl-game [data-id="rotAnyway"]');await s.page.waitForFunction(()=>getComputedStyle(document.querySelector('.pl-game .rotate-hint')).display==='none'); assert((await s.page.$eval('.pl-game .rotate-hint', e => getComputedStyle(e).display)) === 'none', 'play upright anyway dismisses it'); await s.shot('portrait-playing');
     await s.page.setViewportSize({ width: 844, height: 390 }); await s.page.waitForTimeout(300);
-    assert((await s.page.$eval('.pl-game .side-actions', e => getComputedStyle(e).display)) === 'grid', 'side actions in landscape');
+    assert((await s.page.$eval('.pl-game .side-actions', e => getComputedStyle(e).display)) === 'flex', 'six-square side actions in landscape');
+    assert(JSON.stringify(await s.page.locator('.side-actions>[data-rq-utility]').evaluateAll(bs=>bs.map(b=>b.dataset.rqUtility)))===JSON.stringify(['mute','objective','stuck','restart','exit','items']), 'current utility order');
     assert((await s.page.$eval('.pl-game .parser', e => getComputedStyle(e).display)) === 'none', 'parser hidden until Type');
     const noScroll = await s.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1); assert(noScroll, 'no horizontal scroll in landscape');
     await s.shot('landscape');
@@ -190,7 +192,10 @@ await scenario('mobile-layouts', async entry => {
     await s.cmd('take coverall'); await s.dismiss();
     await s.page.click('.pl-game [data-id="sideItems"]'); await s.page.waitForSelector('.pl-game .inv-sheet'); await s.shot('landscape-items'); assert(await s.page.$('.pl-game .inv-card'), 'inventory sheet lists the items');
     const cards = await s.page.$$('.pl-game .inv-card'); let armed = false; for (const c of cards) { const t = await c.textContent(); if (/badge/i.test(t)) { await c.$eval('.btn', b => b.click()); armed = true; break; } }
-    assert(armed, 'badge card found'); await s.page.waitForTimeout(200); assert(await s.page.$('.pl-game .using'), 'Use on… arms the item'); await s.clickCanvas(40, 40); await s.dismiss();
+    assert(armed, 'badge card found'); await s.page.waitForTimeout(200); assert(await s.page.$('.pl-game .using'), 'Use on… arms the item');
+    const cv=await s.page.locator('.pl-game canvas').boundingBox();assert(cv,'canvas exists');
+    await s.page.touchscreen.tap(cv.x+40/320*cv.width,cv.y+40/180*cv.height);await s.page.locator('.rq-context').waitFor();
+    await s.page.locator('.rq-context button').filter({hasText:/^Use .*badge/i}).click();await s.page.waitForFunction(()=>/CONTRACTOR/.test(document.querySelector('.pl-game .sierra.msg')?.textContent || ''),null,{timeout:10000});await s.dismiss();
     const m = s.log.filter(l => l.startsWith('MSG')).pop(); assert(/CONTRACTOR/.test(m || ''), 'tap-to-use badge on the chemical cage: ' + m);
     entry.notes.push('portrait rotate prompt, landscape side actions, Type + Items sheets, tap-to-use on canvas');
   }); await s.close();

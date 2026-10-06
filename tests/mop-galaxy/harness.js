@@ -9,7 +9,8 @@ export const EVIDENCE=path.resolve(process.env.PL_EVIDENCE || 'evidence/mop-gala
 export async function launch(){return chromium.launch({executablePath:process.env.PL_CHROME || chromium.executablePath()});}
 export class Session extends SupplierSession{
  static async open(browser,{player='owner',viewport={width:1100,height:820},name='session'}={}){
-  const ctx=await browser.newContext({viewport,serviceWorkers:'block'});let current=player;
+  const mobile=viewport.width<1000;
+  const ctx=await browser.newContext({viewport,hasTouch:mobile,isMobile:mobile,serviceWorkers:'block'});let current=player;
   if(player!=='anon')await ctx.addCookies([{name:'rq_session',value:token(player),url:BASE,httpOnly:true,sameSite:'Lax'}]);
   const page=await ctx.newPage(),s=new Session(page,name);s.player=()=>current;
   page.on('pageerror',e=>s.errors.push(e.message));
