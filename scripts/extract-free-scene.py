@@ -119,6 +119,60 @@ return {root:shell,get state(){return structuredClone(game);}, refresh:()=>adapt
 };
 }
 '''
+# Mobile presentation/input bridge. Only the reviewed free suite receives metadata;
+# puzzle functions above remain byte-exact, and no owned module is imported.
+presentation = {
+    'me': ('self', []), 'goat': ('npc', ['talk']),
+    'cocktail': ('portable', ['take']), 'keycard': ('object', []),
+    'crackers': ('portable', ['take']), 'ticket': ('portable', ['take']),
+    'tuba': ('object', ['take']), 'phone': ('object', []),
+    'minibar': ('object', []), 'door': ('exit', []),
+    'window': ('object', []), 'painting': ('object', []),
+    'disco': ('object', []), 'sofa': ('object', []), 'table': ('object', [])
+}
+metadata = {}
+for id, (kind, extra) in presentation.items():
+    actions = [{'label': 'Look', 'verb': 'look'}]
+    actions += [{'label': 'Search' if id == 'tuba' and v == 'take' else v.title(), 'verb': v} for v in extra]
+    actions += [{'label': 'Go' if id == 'door' else 'Open' if id in ['minibar', 'window'] else 'Use', 'verb': 'use'}, {'label': 'Walk to', 'verb': 'walk'}]
+    metadata[id] = {'kind': kind, 'actions': actions}
+bridge = '''
+// Context input adapts closure state without changing canonical puzzle handlers.
+let context;
+const inputEngine = {
+ cv, adapter, D: {SKU_GAME}, account, ent: {game:false, walk:false},
+ get game(){return game;}, get view(){return view;},
+ get destroyed(){return !live || disposed;}, get paused(){return paused;},
+ get msgOpen(){return msgOpen;}, get blocking(){return blocking;},
+ get modalCount(){return $('modalRoot').children.length;},
+ get selItem(){return selItem;}, set selItem(v){selItem=v;},
+ get walkTarget(){return walkTarget;}, set walkTarget(v){walkTarget=v;},
+ get walkThen(){return walkThen;}, set walkThen(v){walkThen=v;},
+ $, activeSpots, hitTest, canvasPoint, clampWalk, approach, act,
+ renderInv, renderVerbs, itemLabel:id=>ITEMS[id].name,
+ onCanvasTap:event=>contextTap.call(inputEngine,event)
+};
+'''
+code = code.replace('/* ---------- Drawing: Suite ---------- */',
+    'const CONTEXT_PRESENTATION = '+json.dumps(metadata)+';\nfor (const spot of ROOMS.suite.spots) Object.assign(spot, CONTEXT_PRESENTATION[spot.id]);\n'+bridge+'\n/* ---------- Drawing: Suite ---------- */')
+# Self is a last-resort target, matching the owned engines' hotspot precedence.
+code = code.replace('  for (const s of activeSpots()) {\n    if (s.dyn) { if (Math.abs(x - game.px) < 9 && y > game.py - 38 && y < game.py) return s; continue; }',
+    '  let me;\n  for (const s of activeSpots()) {\n    if (s.dyn) { me=s; continue; }')
+code = code.replace('  return null;\n}\nfunction clampWalk',
+    '  if (me && Math.abs(x - game.px) < 9 && y > game.py - 38 && y < game.py) return me;\n  return null;\n}\nfunction clampWalk')
+for signature in ['function say(text, then) {', 'function die(text) {',
+                  'function overlay(html) {', 'function modal(html, onClose) {',
+                  'function parse(raw) {', 'function restartScene(){',
+                  'function showView(v){']:
+    assert signature in code, signature
+    code = code.replace(signature, signature+' context?.clear();')
+code = code.replace('function render() {', 'function render() { context?.check();')
+code = code.replace('startGame();if(initial.save)',
+    'context=installContextInput(inputEngine);\nconst unsubContext=adapter.subscribe?.(()=>context.clear());\nstartGame();if(initial.save)')
+code = code.replace('pause(){paused=true;', 'pause(){context.clear();paused=true;')
+code = code.replace('refresh:()=>adapter.getState()', 'refresh:()=>{context.clear();return adapter.getState();}')
+code = code.replace('unmount(){if(disposed)return;', 'unmount(){if(disposed)return;context.destroy();unsubContext?.();')
+head = "import {installContextInput, contextTap} from '../../context-input.js';\n"+head
 # No paid content or hint calls can survive extraction.
 for word in ['garage','drawTruck','Pawn receipt','revealHint','listHints','platform.js']:
  assert word not in code, word

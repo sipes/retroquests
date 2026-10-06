@@ -1,3 +1,4 @@
+import {installContextInput, contextTap} from '../../context-input.js';
 // Last Night in Port Lucky — engine. Vanilla JS + canvas, Sierra-style.
 // All platform access goes through the injected adapter (see docs/port-lucky-integration.md).
 import { GAME_ID, SKU_GAME, SKU_WALK, MAX_SCORE, SAVE_VERSION, PAL, ITEMS, CHAPTERS, ROOM_CHAPTER, PUZZLES, LEVEL_NAMES, POINTS, rankFor } from './data.js';
@@ -31,7 +32,7 @@ export class Engine {
     this.$ = id => root.querySelector('[data-id="' + id + '"]');
     this.cv = this.$('canvas'); this.cx = this.cv.getContext('2d');
     this.bg = document.createElement('canvas'); this.bg.width = 320; this.bg.height = 180; this.bx = this.bg.getContext('2d');
-    this.wire();
+    installContextInput(this); this.wire();
     this.renderVerbs(); this.renderInv();
     await this.refreshState();
     if (this.adapter.subscribe) this.unsub = this.adapter.subscribe(() => this.onPlatformChange());
@@ -45,7 +46,7 @@ export class Engine {
     this.start();
     return this;
   }
-  unmount() {
+  unmount() { this.context?.destroy();
     if (this.saveTimer) this.flushSave(true); // don't lose a pending debounced save
     this.destroyed = true; cancelAnimationFrame(this.raf); clearTimeout(this.saveTimer);
     if (this.unsub) this.unsub();
@@ -55,7 +56,7 @@ export class Engine {
   }
 
   // ---------- Platform state ----------
-  async refreshState() {
+  async refreshState() { this.context?.clear();
     let st;
     try { st = await this.adapter.getState(); } catch (e) { st = { user: null, entitlements: [], save: null, catalog: {} }; this.toast('Could not reach the arcade. Playing offline until it comes back.'); }
     this.account = st.user || null;
@@ -113,8 +114,8 @@ export class Engine {
     this.renderInv(); this.updateHud(); this.updateClockUI(); this.persist();
     this.script.onRestart(this.game.chapter);
   }
-  clearTransient() { this.msgQueue = []; this.msgOpen = false; this.blocking = false; this.choiceOpen = false; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.selItem = null; }
-  clearOverlays() { if (!this.root) return; this.root.querySelectorAll('[data-id="view"] .sierra, [data-id="view"] .overlay-card, .modal-veil').forEach(n => n.remove()); this.modalCount = 0; this.blocking = false; this.msgOpen = false; this.choiceOpen = false; }
+  clearTransient() { this.context?.clear(); this.msgQueue = []; this.msgOpen = false; this.blocking = false; this.choiceOpen = false; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.selItem = null; }
+  clearOverlays() { this.context?.clear(); if (!this.root) return; this.root.querySelectorAll('[data-id="view"] .sierra, [data-id="view"] .overlay-card, .modal-veil').forEach(n => n.remove()); this.modalCount = 0; this.blocking = false; this.msgOpen = false; this.choiceOpen = false; }
 
   // ---------- Saving ----------
   persist() {
@@ -142,7 +143,7 @@ export class Engine {
   }
 
   // ---------- Messages / choices / deaths ----------
-  say(text, then) { this.msgQueue.push({ text, then }); if (!this.msgOpen) this.nextMsg(); }
+  say(text, then) { this.context?.clear(); this.msgQueue.push({ text, then }); if (!this.msgOpen) this.nextMsg(); }
   nextMsg() {
     const view = this.$('view'); const old = view.querySelector('.sierra.msg'); if (old) old.remove();
     const m = this.msgQueue.shift(); if (!m) { this.msgOpen = false; return; }
@@ -156,7 +157,7 @@ export class Engine {
     view.appendChild(box); box.focus({ preventScroll: true });
   }
   // Dialogue choice box. options: [{label, value}]. Resolves with value. Pauses the clock while open.
-  choose(prompt, options) {
+  choose(prompt, options) { this.context?.clear();
     return new Promise(resolve => {
       const view = this.$('view'); this.choiceOpen = true;
       const box = document.createElement('div'); box.className = 'sierra choice'; box.setAttribute('role', 'dialog');
@@ -166,7 +167,7 @@ export class Engine {
       box.appendChild(a); view.appendChild(box);
     });
   }
-  die(text) {
+  die(text) { this.context?.clear();
     const snap = this.lastSnap || this.snapshot();
     const view = this.$('view');
     const box = document.createElement('div'); box.className = 'sierra death'; box.setAttribute('role', 'alertdialog');
@@ -179,8 +180,8 @@ export class Engine {
     restart.onclick = e => { e.stopPropagation(); box.remove(); this.restartScene(); };
     this.msgQueue = []; this.blocking = true; view.appendChild(box); again.focus();
   }
-  overlay(html) { const o = document.createElement('div'); o.className = 'overlay-card'; o.innerHTML = html; this.$('view').appendChild(o); this.blocking = true; return o; }
-  modal(html) {
+  overlay(html) { this.context?.clear(); const o = document.createElement('div'); o.className = 'overlay-card'; o.innerHTML = html; this.$('view').appendChild(o); this.blocking = true; return o; }
+  modal(html) { this.context?.clear();
     const v = document.createElement('div'); v.className = 'modal-veil'; v.innerHTML = html; this.modalCount++;
     const close = () => { if (!v.isConnected) return; v.remove(); this.modalCount--; document.removeEventListener('keydown', esc); this.refocus(); };
     const esc = e => { if (e.key === 'Escape') close(); };
@@ -206,7 +207,7 @@ export class Engine {
   room() { return ROOMS[this.game.room]; }
   spotName(id) { const s = this.room().spots.find(x => x.id === id); return s ? s.name : id; }
   activeSpots() { return this.room().spots.filter(s => !s.when || s.when(this.game)); }
-  gotoRoom(id, px, py, dir) { this.game.room = id; this.game.px = px; this.game.py = py; this.game.dir = dir || 1; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.updateHud(); this.persist(); }
+  gotoRoom(id, px, py, dir) { this.context?.clear(); this.game.room = id; this.game.px = px; this.game.py = py; this.game.dir = dir || 1; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.updateHud(); this.persist(); }
   updateHud() {
     const g = this.game; if (!g || !this.root) return;
     this.$('score').textContent = `Score: ${g.score} of ${MAX_SCORE}`;
@@ -235,7 +236,7 @@ export class Engine {
   startClock() { this.game.clock = CLOCK_START; this.updateClockUI(); }
 
   // ---------- Rendering ----------
-  render(t) {
+  render(t) { this.context?.check();
     const dt = Math.min(0.25, (t - this.lastTick) / 1000); this.lastTick = t; this.frame++;
     if (this.view !== 'game' || !this.game) return;
     this.tickClock(dt);
@@ -274,6 +275,8 @@ export class Engine {
   }
   combine(a, b) { this.lastSnap = this.snapshot(); try { this.script.combine(a, b); } catch (e) { console.error(e); } this.persist(); }
   canvasPoint(e) { const r = this.cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 320, (e.clientY - r.top) / r.height * 180]; }
+  onCanvasTap(e) { return contextTap.call(this, e); }
+  contextDrawerOpen() { return this.$ && !this.$('drawer').hidden; }
   onCanvasClick(e) {
     if (this.msgOpen || this.blocking || this.choiceOpen || !this.game || this.view !== 'game') return;
     const [x, y] = this.canvasPoint(e); const spot = this.hitTest(x, y);
@@ -329,7 +332,7 @@ export class Engine {
   }
 
   // ---------- Parser ----------
-  parse(raw) {
+  parse(raw) { this.context?.clear();
     const g = this.game; if (!g) return; const txt = raw.toLowerCase().trim(); if (!txt) return;
     const STOP = new Set(['the','a','an','at','to','on','with','into','onto','up','from','my','some','this','that','of','for','please','around','about','in','inside','through','out','off']);
     const VMAP = {
@@ -437,7 +440,7 @@ export class Engine {
     if (!this.account || !this.ent.walk || !this.adapter.listHints) return;
     try { const r = await this.adapter.listHints(GAME_ID); const rev = {}; (r.revealed || []).forEach(h => { if (h.text) this.hintTexts[h.puzzle_id + h.level] = h.text; rev[h.puzzle_id] = Math.max(rev[h.puzzle_id] ?? -1, h.level); }); if (this.game) { this.game.revealed = rev; this.game.hintsUsed = r.count || 0; this.updateHud(); } } catch (e) {}
   }
-  openDrawer() { this.shown = {}; this.renderDrawer(); this.loadHints().then(() => { if (!this.$('drawer').hidden) this.renderDrawer(); }); this.$('drawer').hidden = false; this.$('drawerveil').hidden = false; const f = this.$('drawer').querySelector('button'); if (f) f.focus(); }
+  openDrawer() { this.context?.clear(); this.shown = {}; this.renderDrawer(); this.loadHints().then(() => { if (!this.$('drawer').hidden) this.renderDrawer(); }); this.$('drawer').hidden = false; this.$('drawerveil').hidden = false; const f = this.$('drawer').querySelector('button'); if (f) f.focus(); }
   closeDrawer(silent) { this.$('drawer').hidden = true; this.$('drawerveil').hidden = true; this.shown = {}; if (!silent) this.refocus(); }
   renderDrawer() {
     const d = this.$('drawer'); d.innerHTML = ''; const g = this.game;
@@ -527,7 +530,7 @@ export class Engine {
     this.cv.addEventListener('mouseleave', () => { $('hover').textContent = ' '; });
     $('parser').addEventListener('submit', e => { e.preventDefault(); if (this.msgOpen || this.blocking || this.choiceOpen) return; const v = $('cmd').value; $('cmd').value = ''; this.parse(v); });
     $('restart').onclick = () => { if (!this.game) return; if (!this.blocking || this.root.querySelector('.sierra.death')) this.restartScene(); };
-    $('exit').onclick = () => { this.flushSave(false); if (this.options.onExit) this.options.onExit('user'); };
+    $('exit').onclick = () => { this.context?.clear(); this.flushSave(false); if (this.options.onExit) this.options.onExit('user'); };
     $('stucktab').onclick = () => this.openDrawer();
     $('drawerveil').onclick = () => this.closeDrawer();
     $('sideStuck').onclick = () => this.openDrawer();

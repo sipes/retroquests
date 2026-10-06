@@ -18,7 +18,13 @@ const fresh=()=>({...DEMO.CHAPTER_START(1),ownerId:'synthetic-player'});
 const text=p=>readFileSync(p,'utf8');
 
 test('supplier story, puzzles, room geometry and procedural art are preserved',()=>{
-  for(const file of ['data.js','rooms.js','script.js']) assert.equal(text(join(owned,file)),text(join(supplied,'mop-galaxy',file)),file);
+  for(const file of ['data.js','script.js']) assert.equal(text(join(owned,file)),text(join(supplied,'mop-galaxy',file)),file);
+  // Approved mobile-context-v1 exception: append-only, non-spoiler action presentation.
+  // Supplier rooms/geometry/visibility functions remain byte-identical before this marker.
+  const rooms=text(join(owned,'rooms.js')), marker='\n// Approved presentation-only contextual actions (mobile-context-v1).\n';
+  assert.equal(rooms.split(marker)[0],text(join(supplied,'mop-galaxy','rooms.js')));
+  assert.equal(rooms.split(marker).length,2);
+  for(const room of Object.values(OWNED.ROOMS))for(const spot of room.spots){assert.ok(spot.actions.length);for(const a of spot.actions)assert.deepEqual(Object.keys(a).sort(),['label','verb']);}
   assert.equal(text(join(owned,'art.js')),text(join(supplied,'mop-galaxy/art.js')).replace("'../_shared/pixels.js'","'./pixels.js'"));
   for(const file of ['pixels.js','template.js']) assert.equal(text(join(owned,file)),text(join(supplied,'_shared',file)));
   assert.equal(Object.keys(OWNED.ROOMS).length,19);
@@ -39,6 +45,7 @@ test('Scene 1 extraction is deterministic, read-only --check and closed import g
     const source=text(path);
     assert.doesNotMatch(source,/4471|HANDLERS\.(cryo|gallery|bridge)|gumbo1|codecard|startChapter\(2\)|revealHint\(|listHints\(/,path);
     for(const match of source.matchAll(/\b(?:import|export)\s+(?:[^'"\n]*?\s+from\s*)?['"]([^'"]+)['"]/g)) {
+      if(match[1]==='../../context-input.js'){assert.equal(path,join(demo,'engine.js'));assert.doesNotMatch(text(join(root,'public/context-input.js')),/4471|gumbo1|codecard|HANDLERS\./);continue;}
       assert.ok(match[1].startsWith('./'),match[1]); walk(resolve(dirname(path),match[1]));
     }
   }
@@ -81,14 +88,14 @@ async function browserFixture(t){
   const server=createServer((req,res)=>{
     const p=new URL(req.url,'http://localhost').pathname;
     if(p==='/'){res.setHeader('content-type','text/html');res.end('<!doctype html><div id="port" class="pl-game"><button>Port Lucky sentinel</button></div><div id="game"></div>');return;}
-    if(!/^\/((games|demos)\/mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
+    if(p!=='/context-input.js' && !/^\/((games|demos)\/mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
     const path=join(root,'public',p);if(!existsSync(path)){res.writeHead(404);res.end();return;}
     res.setHeader('content-type',p.endsWith('.css')?'text/css':'text/javascript');res.end(readFileSync(path));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const executablePath=process.env.RETRO_CHROMIUM || process.env.PL_CHROME || '/home/openclaw/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome';
   const browser=await chromium.launch({executablePath,headless:true,args:['--no-sandbox']});
-  t.after(async()=>{await browser.close();await new Promise(r=>server.close(r));});
+  t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));});
   const page=await browser.newPage({viewport:{width:1100,height:800}}),errors=[],requests=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(new URL(r.url()).pathname));
   await page.goto('http://127.0.0.1:'+server.address().port);

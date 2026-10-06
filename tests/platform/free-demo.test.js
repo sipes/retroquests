@@ -8,8 +8,25 @@ const fresh=()=>({room:'suite',inv:[],flags:{},score:0,scored:{},revealed:{},hin
 test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no paid content/imports/hints',()=>{
  const old=execFileSync('git',['show','c508239:public/index.html'],{encoding:'utf8'}),demo=readFileSync('public/demos/port-lucky/game.js','utf8');
  for(const [start,end] of [['function drawSuiteBg','/* ---------- Drawing: Garage'],['function suiteAct','function leaveSuite']])assert.ok(demo.includes(old.slice(old.indexOf(start),old.indexOf(end))));
- assert.doesNotMatch(demo,/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
- for(const file of readdirSync('public/games/port-lucky'))assert.deepEqual(readFileSync('public/games/port-lucky/'+file),execFileSync('git',['show','ecae4de:public/games/port-lucky/'+file]));
+ const safeImport="import {installContextInput, contextTap} from '../../context-input.js';\n";
+ assert.equal(demo.split(safeImport).length,2);
+ assert.doesNotMatch(demo.replace(safeImport,''),/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
+ const marker='\n// Approved presentation-only contextual actions (mobile-context-v1).\n';
+ for(const file of readdirSync('public/games/port-lucky')){
+  let expected=execFileSync('git',['show','ecae4de:public/games/port-lucky/'+file],{encoding:'utf8'});
+  let actual=readFileSync('public/games/port-lucky/'+file,'utf8');
+  if(file==='rooms.js'){assert.equal(actual.split(marker).length,2);actual=actual.split(marker)[0];}
+  if(file==='engine.js'){
+   // Exact approved plumbing only; all parser, dispatch, save and story bytes stay pinned.
+   expected=safeImport+expected;
+   expected=expected.replace('    this.wire();','    installContextInput(this); this.wire();');
+   for(const sig of ['async refreshState() {','clearTransient() {','clearOverlays() {','say(text, then) {','die(text) {','overlay(html) {','modal(html) {','gotoRoom(id, px, py, dir) {','parse(raw) {','openDrawer() {','choose(prompt, options) {'])expected=expected.replace(sig,sig+' this.context?.clear();');
+   expected=expected.replace('unmount() {','unmount() { this.context?.destroy();').replace('render(t) {','render(t) { this.context?.check();');
+   expected=expected.replace('  onCanvasClick(e) {','  onCanvasTap(e) { return contextTap.call(this, e); }\n  contextDrawerOpen() { return this.$ && !this.$(\'drawer\').hidden; }\n  onCanvasClick(e) {');
+   expected=expected.replace("$('exit').onclick = () => {", "$('exit').onclick = () => { this.context?.clear();");
+  }
+  assert.equal(actual,expected,file);
+ }
 });
 test('generated free-demo paywall truthfully labels available and disabled purchase states',()=>{
  const demo=readFileSync('public/demos/port-lucky/game.js','utf8');
