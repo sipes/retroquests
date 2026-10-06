@@ -148,7 +148,7 @@ const inputEngine = {
  get selItem(){return selItem;}, set selItem(v){selItem=v;},
  get walkTarget(){return walkTarget;}, set walkTarget(v){walkTarget=v;},
  get walkThen(){return walkThen;}, set walkThen(v){walkThen=v;},
- $, activeSpots, hitTest, canvasPoint, clampWalk, approach, act,
+ root:body, modal, $, activeSpots, hitTest, canvasPoint, clampWalk, approach, act,
  renderInv, renderVerbs, itemLabel:id=>ITEMS[id].name,
  onCanvasTap:event=>contextTap.call(inputEngine,event)
 };
@@ -173,6 +173,16 @@ code = code.replace('pause(){paused=true;', 'pause(){context.clear();paused=true
 code = code.replace('refresh:()=>adapter.getState()', 'refresh:()=>{context.clear();return adapter.getState();}')
 code = code.replace('unmount(){if(disposed)return;', 'unmount(){if(disposed)return;context.destroy();unsubContext?.();')
 head = "import {installContextInput, contextTap} from '../../context-input.js';\n"+head
+# Shared gameplay UI imports no protected content. Demo contract is Scene 1 only.
+head = "import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';\n"+head
+code = code.replace("const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];", '')
+scene1 = {'1': {'objective':'Get your bearings after last night and find a way out of the honeymoon suite.', 'keys':['feed','arm','minibar','crackers','ticket','tuba','desk','door']}}
+points1 = {'feed':5,'arm':1,'minibar':2,'crackers':2,'ticket':5,'tuba':2,'desk':3,'door':5}
+head += 'const SCENES='+json.dumps(scene1)+';\nconst SCENE_POINTS='+json.dumps(points1)+';\n'
+code = code.replace('context=installContextInput(inputEngine);', 'context=installContextInput(inputEngine);\nconst gameplay=installGameplayControls(inputEngine,SCENES);')
+code = code.replace('function render() { context?.check();', 'function render() { context?.check();inputEngine.gameplay?.check();')
+code = code.replace('`Score: ${game.score} of 250`', 'scoreDisplay({...game,chapter:1},SCENES,SCENE_POINTS)')
+code = code.replace('unsubContext?.();', 'unsubContext?.();gameplay.destroy();')
 # No paid content or hint calls can survive extraction.
 for word in ['garage','drawTruck','Pawn receipt','revealHint','listHints','platform.js']:
  assert word not in code, word

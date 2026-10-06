@@ -10,13 +10,21 @@ test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no 
  for(const [start,end] of [['function drawSuiteBg','/* ---------- Drawing: Garage'],['function suiteAct','function leaveSuite']])assert.ok(demo.includes(old.slice(old.indexOf(start),old.indexOf(end))));
  const safeImport="import {installContextInput, contextTap} from '../../context-input.js';\n";
  assert.equal(demo.split(safeImport).length,2);
- assert.doesNotMatch(demo.replace(safeImport,''),/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
+ const gameplayImport="import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';\n";
+ assert.equal(demo.split(gameplayImport).length,2);
+ assert.doesNotMatch(demo.replace(safeImport,'').replace(gameplayImport,''),/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
  const marker='\n// Approved presentation-only contextual actions (mobile-context-v1).\n';
  for(const file of readdirSync('public/games/port-lucky')){
   let expected=execFileSync('git',['show','ecae4de:public/games/port-lucky/'+file],{encoding:'utf8'});
   let actual=readFileSync('public/games/port-lucky/'+file,'utf8');
   if(file==='rooms.js'){assert.equal(actual.split(marker).length,2);actual=actual.split(marker)[0];}
   if(file==='engine.js'){
+   // Strip only the named gameplay-A presentation contract. Pin the rest exactly.
+   actual=actual.replace(/import \{VERBS, installGameplayControls, scoreDisplay\} from '\.\.\/\.\.\/gameplay-controls\.js';\nexport const SCENES = [\s\S]*?;\n/,"const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];\n")
+    .replace(' this.wire(); installGameplayControls(this, SCENES);',' this.wire();')
+    .replace('unmount() { this.gameplay?.destroy();','unmount() {')
+    .replace('this.context?.check(); this.gameplay?.check();','this.context?.check();')
+    .replace('scoreDisplay(g, SCENES, POINTS)','`Score: ${g.score} of ${MAX_SCORE}`');
    // Exact approved plumbing only; all parser, dispatch, save and story bytes stay pinned.
    expected=safeImport+expected;
    expected=expected.replace('    this.wire();','    installContextInput(this); this.wire();');

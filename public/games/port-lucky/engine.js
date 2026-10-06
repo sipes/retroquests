@@ -7,7 +7,112 @@ import { ART, drawPlayer } from './art.js';
 import { createScript, CHAPTER_START, migrateSave } from './script.js';
 import { TEMPLATE } from './template.js';
 
-const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];
+import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';
+export const SCENES = {
+  "1": {
+    "objective": "Get your bearings after last night and find a way out of the honeymoon suite.",
+    "keys": [
+      "feed",
+      "arm",
+      "minibar",
+      "crackers",
+      "ticket",
+      "tuba",
+      "desk",
+      "door"
+    ]
+  },
+  "2": {
+    "objective": "Find a lead on where Benny went after leaving the hotel.",
+    "keys": [
+      "valet",
+      "truck",
+      "shoe",
+      "receipt"
+    ]
+  },
+  "3": {
+    "objective": "Piece together what happened last night and discover where to look next.",
+    "keys": [
+      "earl-regular",
+      "earl-receipt",
+      "duane-wake",
+      "duane-story",
+      "ledger",
+      "feather-pick",
+      "jingle"
+    ]
+  },
+  "4": {
+    "objective": "Recover your belongings and follow the trail to Benny.",
+    "keys": [
+      "sal-talk",
+      "sal-deal",
+      "nadia-debt",
+      "phone-back",
+      "phone-back-dolphin",
+      "nadia-dolphin",
+      "quarters",
+      "claw-fail",
+      "claw-win",
+      "zora",
+      "kevin-call"
+    ]
+  },
+  "5": {
+    "objective": "Find Benny and bring him safely back to shore.",
+    "keys": [
+      "telescope",
+      "oscar-talk",
+      "oscar-bait",
+      "oars",
+      "rope-tie",
+      "row",
+      "shoe-pair",
+      "wake",
+      "haul"
+    ]
+  },
+  "6": {
+    "objective": "Put matters right before taking Benny to the wedding.",
+    "keys": [
+      "cloche",
+      "knock",
+      "feather-match",
+      "photo",
+      "truth",
+      "tea"
+    ]
+  },
+  "7": {
+    "objective": "Get the groom and your best-man duties ready before the ceremony.",
+    "keys": [
+      "water",
+      "tux",
+      "shoes",
+      "earl-stall",
+      "earl-settle",
+      "sal-goat",
+      "watch-back",
+      "bowtie-gus",
+      "cushion",
+      "program",
+      "napkin"
+    ]
+  },
+  "8": {
+    "objective": "See the happy couple through the celebration and settle your loose ends.",
+    "keys": [
+      "rings-handoff",
+      "speech-honest",
+      "speech-ok",
+      "kevin-tip",
+      "marg-log",
+      "earl-token",
+      "watch-benny"
+    ]
+  }
+};
 const CLOCK_RATE = 3;          // game-seconds per real second in chapter 7 (12 game-minutes = 4 real minutes)
 const CLOCK_START = 12 * 60;   // seconds
 
@@ -32,7 +137,7 @@ export class Engine {
     this.$ = id => root.querySelector('[data-id="' + id + '"]');
     this.cv = this.$('canvas'); this.cx = this.cv.getContext('2d');
     this.bg = document.createElement('canvas'); this.bg.width = 320; this.bg.height = 180; this.bx = this.bg.getContext('2d');
-    installContextInput(this); this.wire();
+    installContextInput(this); this.wire(); installGameplayControls(this, SCENES);
     this.renderVerbs(); this.renderInv();
     await this.refreshState();
     if (this.adapter.subscribe) this.unsub = this.adapter.subscribe(() => this.onPlatformChange());
@@ -46,7 +151,7 @@ export class Engine {
     this.start();
     return this;
   }
-  unmount() { this.context?.destroy();
+  unmount() { this.gameplay?.destroy(); this.context?.destroy();
     if (this.saveTimer) this.flushSave(true); // don't lose a pending debounced save
     this.destroyed = true; cancelAnimationFrame(this.raf); clearTimeout(this.saveTimer);
     if (this.unsub) this.unsub();
@@ -210,7 +315,7 @@ export class Engine {
   gotoRoom(id, px, py, dir) { this.context?.clear(); this.game.room = id; this.game.px = px; this.game.py = py; this.game.dir = dir || 1; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.updateHud(); this.persist(); }
   updateHud() {
     const g = this.game; if (!g || !this.root) return;
-    this.$('score').textContent = `Score: ${g.score} of ${MAX_SCORE}`;
+    this.$('score').textContent = scoreDisplay(g, SCENES, POINTS);
     this.$('roomtxt').textContent = this.room().title;
     this.$('hints').textContent = `Hints: ${g.hintsUsed}`;
     const inv = this.$('invcount'); if (inv) inv.textContent = g.inv.length;
@@ -236,7 +341,7 @@ export class Engine {
   startClock() { this.game.clock = CLOCK_START; this.updateClockUI(); }
 
   // ---------- Rendering ----------
-  render(t) { this.context?.check();
+  render(t) { this.context?.check(); this.gameplay?.check();
     const dt = Math.min(0.25, (t - this.lastTick) / 1000); this.lastTick = t; this.frame++;
     if (this.view !== 'game' || !this.game) return;
     this.tickClock(dt);

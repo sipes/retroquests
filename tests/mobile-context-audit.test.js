@@ -23,5 +23,8 @@ test('presentation helper is publicly served without broadening any protected ro
  for(const path of ['/context-input.js.map','/%63ontext-input.js','/games/_shared/context-input.js','/games/port-lucky/context-input.js','/games/mop-galaxy/context-input.js'])assert.equal((await call(env,path)).status,404,path);
  assert.equal((await call(env,'/games/port-lucky/engine.js')).status,401);
  assert.equal((await call(env,'/games/mop-galaxy/engine.js')).status,401);
- const source=readFileSync('public/context-input.js','utf8');assert.doesNotMatch(source,/^import |HANDLERS|4471|gumbo|crackers/m);
+ const source=readFileSync('public/context-input.js','utf8');
+ const safeImport="import {VERBS} from './gameplay-controls.js';\n";
+ assert.equal(source.split(safeImport).length,2);assert.doesNotMatch(source.replace(safeImport,''),/^import |HANDLERS|4471|gumbo|crackers/m);
+ assert.doesNotMatch(readFileSync('public/gameplay-controls.js','utf8'),/HANDLERS|4471|gumbo|crackers|revealHint|listHints/);
 });

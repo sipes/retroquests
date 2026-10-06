@@ -1,3 +1,4 @@
+import {VERBS} from './gameplay-controls.js';
 // Presentation-only input. No game data, puzzle knowledge or platform routes.
 export class ContextInput {
   constructor(engine) { this.e = engine; this.selected = null; this.sequence = 0; this.listeners = []; this.pointers = new Map(); this.suppressUntil = 0; }
@@ -23,10 +24,10 @@ export class ContextInput {
     const title=doc.createElement('strong');title.textContent=picker?'Use / Give item to '+spot.name:spot.name;box.append(title);
     const button=(label,fn)=>{const b=doc.createElement('button');b.type='button';b.textContent=label;b.onclick=event=>{event.stopPropagation();if(this.selected===s && this.current(s))fn();};box.append(b);};
     if(picker){for(const id of this.e.game.inv)button(this.e.itemLabel(id),()=>this.dispatch({verb:'use'},s,id));if(!this.e.game.inv.length){const p=doc.createElement('span');p.textContent='Nothing carried';box.append(p);}}
-    else {for(const a of spot.actions || [])button(a.label,()=>this.dispatch(a,s));button('Use item…',()=>this.paint(true));if(spot.kind==='npc')button('Give…',()=>this.paint(true));if(this.e.selItem && this.e.game.inv.includes(this.e.selItem)){const item=this.e.selItem;button('Use '+this.e.itemLabel(item),()=>this.dispatch({verb:'use'},s,item));}}
+    else {for(const [verb,label] of VERBS)button(label,()=>this.dispatch({verb},s));button('Use item…',()=>this.paint(true));if(spot.kind==='npc')button('Give…',()=>this.paint(true));if(this.e.selItem && this.e.game.inv.includes(this.e.selItem)){const item=this.e.selItem;button('Use '+this.e.itemLabel(item),()=>this.dispatch({verb:'use'},s,item));}}
     button('Cancel',()=>this.clear());this.menu=box;this.e.$('view').append(box);this.position();
   }
-  position() { if(!this.menu)return;const r=this.e.$('view').getBoundingClientRect(),win=this.e.cv.ownerDocument.defaultView,vv=win.visualViewport;const left=Math.max(r.left,vv?.offsetLeft || 0)+6,top=Math.max(r.top,vv?.offsetTop || 0)+6,right=Math.min(r.right,(vv?.offsetLeft || 0)+(vv?.width || win.innerWidth))-6,bottom=Math.min(r.bottom,(vv?.offsetTop || 0)+(vv?.height || win.innerHeight))-6;Object.assign(this.menu.style,{left:(left-r.left)+'px',top:(top-r.top)+'px',width:Math.max(0,Math.min(270,right-left))+'px',maxHeight:Math.max(0,bottom-top)+'px'}); }
+  position() { if(!this.menu)return;const r=this.e.$('view').getBoundingClientRect(),win=this.e.cv.ownerDocument.defaultView,vv=win.visualViewport;const left=Math.max(r.left,vv?.offsetLeft || 0)+6,top=Math.max(r.top,vv?.offsetTop || 0)+6,right=Math.min(r.right,(vv?.offsetLeft || 0)+(vv?.width || win.innerWidth))-6,bottom=(vv?.offsetTop || 0)+(vv?.height || win.innerHeight)-6;Object.assign(this.menu.style,{left:(left-r.left)+'px',top:(top-r.top)+'px',width:Math.max(0,Math.min(270,right-left))+'px',maxHeight:Math.max(0,bottom-top)+'px'}); }
   listen(target,type,fn,opts) {target.addEventListener(type,fn,opts);this.listeners.push([target,type,fn,opts]);}
   wire() {
     const e=this.e,cv=e.cv,doc=cv.ownerDocument,win=doc.defaultView;

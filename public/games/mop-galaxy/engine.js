@@ -3,7 +3,132 @@ import {installContextInput, contextTap} from '../../context-input.js';
 // A game passes a definition object (see public/games/port-lucky/game.js) and an injected platform adapter.
 // All platform access goes through the adapter (docs/port-lucky-integration.md §2.1).
 const LEVEL_NAMES = ['Nudge', 'Clue', 'Full solution'];
-const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];
+import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';
+export const SCENES = {
+  "1": {
+    "objective": "Find out what has changed aboard the Hyacinth and leave Deck 9.",
+    "keys": [
+      "look-arm",
+      "badge",
+      "vent",
+      "shelf-look",
+      "coin-vend",
+      "wrench",
+      "bolts",
+      "mop-chute",
+      "climb"
+    ]
+  },
+  "2": {
+    "objective": "Learn what is happening to the sleeping colonists and get past the search.",
+    "keys": [
+      "notice",
+      "nameplate",
+      "hide",
+      "drain",
+      "roster",
+      "okonjo-look",
+      "blanket",
+      "duct2"
+    ]
+  },
+  "3": {
+    "objective": "Find help and a way onward through the ship.",
+    "keys": [
+      "compost-look",
+      "tray-feed",
+      "gumbo",
+      "board",
+      "thistle-talk",
+      "roster-show",
+      "tomato",
+      "locker",
+      "oven",
+      "rations",
+      "gumbo-ties",
+      "wheel",
+      "dish",
+      "vault"
+    ]
+  },
+  "4": {
+    "objective": "Keep the ship from being taken to the wrong destination and prepare to move onward.",
+    "keys": [
+      "headphones",
+      "suppression",
+      "filter-out",
+      "polish-in",
+      "oven-in",
+      "gauge",
+      "airlock",
+      "suit",
+      "helmet-tape",
+      "o2",
+      "tether",
+      "suitcheck"
+    ]
+  },
+  "5": {
+    "objective": "Safely make your way outside the ship and get a message out.",
+    "keys": [
+      "clip",
+      "plate",
+      "gap",
+      "pin",
+      "padlock",
+      "crank",
+      "panel",
+      "broadcast"
+    ]
+  },
+  "6": {
+    "objective": "Find out why the ship and its passengers are being claimed.",
+    "keys": [
+      "coffee",
+      "brack",
+      "notice-show",
+      "roster-show2",
+      "contract-loss",
+      "log",
+      "code-seen",
+      "mop-stamp",
+      "filing",
+      "seed"
+    ]
+  },
+  "7": {
+    "objective": "Get free of the Lien and return to the Hyacinth.",
+    "keys": [
+      "crate",
+      "slip",
+      "keypad",
+      "gumbo-vent",
+      "cat",
+      "jacket",
+      "lockbox",
+      "lights",
+      "mop-polish",
+      "keyA",
+      "gumbo-key",
+      "turn",
+      "lever",
+      "run"
+    ]
+  },
+  "8": {
+    "objective": "Reach the captain and protect the colonists before time runs out.",
+    "keys": [
+      "lift",
+      "code",
+      "brack-stall",
+      "thaw",
+      "answer",
+      "answer-ok",
+      "answer-weak",
+      "seal"
+    ]
+  }
+};
 
 export class Engine {
   constructor(def, container, adapter, options = {}) {
@@ -37,7 +162,7 @@ export class Engine {
     this.$ = id => root.querySelector('[data-id="' + id + '"]');
     this.cv = this.$('canvas'); this.cx = this.cv.getContext('2d');
     this.bg = document.createElement('canvas'); this.bg.width = 320; this.bg.height = 180; this.bx = this.bg.getContext('2d');
-    installContextInput(this); this.wire();
+    installContextInput(this); this.wire(); installGameplayControls(this, SCENES);
     this.renderVerbs(); this.renderInv();
     if (this.adapter.subscribe) this.unsub = this.adapter.subscribe(() => this.onPlatformChange().catch(() => {}));
     this.onVis = () => { this.updateClockUI(); };
@@ -50,7 +175,7 @@ export class Engine {
     this.start();
     return this;
   }
-  unmount({ save = true } = {}) { this.context?.destroy();
+  unmount({ save = true } = {}) { this.gameplay?.destroy(); this.context?.destroy();
     if (this.destroyed) return;
     if (save && this.saveTimer) this.flushSave(true); // normal exit only; never save after revocation
     this.destroyed = true; cancelAnimationFrame(this.raf); clearTimeout(this.saveTimer);
@@ -219,7 +344,7 @@ export class Engine {
   gotoRoom(id, px, py, dir) { this.context?.clear(); this.game.room = id; this.game.px = px; this.game.py = py; this.game.dir = dir || 1; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.updateHud(); this.persist(); }
   updateHud() {
     const g = this.game; if (!g || !this.root) return;
-    this.$('score').textContent = `Score: ${g.score} of ${this.D.MAX_SCORE}`;
+    this.$('score').textContent = scoreDisplay(g, SCENES, this.D.POINTS);
     this.$('roomtxt').textContent = this.room().title;
     this.$('hints').textContent = `Hints: ${g.hintsUsed}`;
     const inv = this.$('invcount'); if (inv) inv.textContent = g.inv.length;
@@ -243,7 +368,7 @@ export class Engine {
   startClock() { this.game.clock = this.D.clock.start; this.updateClockUI(); }
 
   // ---------- Rendering ----------
-  render(t) { this.context?.check();
+  render(t) { this.context?.check(); this.gameplay?.check();
     const dt = Math.min(0.25, (t - this.lastTick) / 1000); this.lastTick = t; this.frame++;
     if (this.view !== 'game' || !this.game) return;
     this.tickClock(dt);

@@ -45,7 +45,7 @@ test('Scene 1 extraction is deterministic, read-only --check and closed import g
     const source=text(path);
     assert.doesNotMatch(source,/4471|HANDLERS\.(cryo|gallery|bridge)|gumbo1|codecard|startChapter\(2\)|revealHint\(|listHints\(/,path);
     for(const match of source.matchAll(/\b(?:import|export)\s+(?:[^'"\n]*?\s+from\s*)?['"]([^'"]+)['"]/g)) {
-      if(match[1]==='../../context-input.js'){assert.equal(path,join(demo,'engine.js'));assert.doesNotMatch(text(join(root,'public/context-input.js')),/4471|gumbo1|codecard|HANDLERS\./);continue;}
+      if(['../../context-input.js','../../gameplay-controls.js'].includes(match[1])){assert.equal(path,join(demo,'engine.js'));assert.doesNotMatch(text(join(root,'public',match[1].split('/').pop())),/4471|gumbo1|codecard|HANDLERS\./);continue;}
       assert.ok(match[1].startsWith('./'),match[1]); walk(resolve(dirname(path),match[1]));
     }
   }
@@ -88,7 +88,7 @@ async function browserFixture(t){
   const server=createServer((req,res)=>{
     const p=new URL(req.url,'http://localhost').pathname;
     if(p==='/'){res.setHeader('content-type','text/html');res.end('<!doctype html><div id="port" class="pl-game"><button>Port Lucky sentinel</button></div><div id="game"></div>');return;}
-    if(p!=='/context-input.js' && !/^\/((games|demos)\/mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
+    if(!['/context-input.js','/gameplay-controls.js'].includes(p) && !/^\/((games|demos)\/mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
     const path=join(root,'public',p);if(!existsSync(path)){res.writeHead(404);res.end();return;}
     res.setHeader('content-type',p.endsWith('.css')?'text/css':'text/javascript');res.end(readFileSync(path));
   });

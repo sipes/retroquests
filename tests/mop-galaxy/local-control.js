@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 export const ROOT=path.resolve(import.meta.dirname,'../..');
 export const E=process.env.MG_EVIDENCE_ROOT || path.join(ROOT,'evidence/mop-galaxy-v1');
+const runtime=process.env.MG_RUNTIME_ROOT || E;
 export const BASE=process.env.MG_BASE || 'http://127.0.0.1:8799';
 export const ids={owner:'10000000-0000-4000-8000-000000000001',walkthrough:'10000000-0000-4000-8000-000000000002',free:'10000000-0000-4000-8000-000000000003',port:'10000000-0000-4000-8000-000000000004',both:'10000000-0000-4000-8000-000000000005',admin:'10000000-0000-4000-8000-000000000006',buyer:'10000000-0000-4000-8000-000000000007'};
 export const token=p=>'synthetic-mop-session-'+p;
@@ -15,7 +16,7 @@ export function sql(text){
  const file=path.join(E,'control-'+process.pid+'.sql');fs.writeFileSync(file,text);
  let r;
  for(let attempt=0;attempt<5;attempt++){
-  try{r=execFileSync('npm',['exec','--no','--','wrangler','d1','execute','retroquests-mop-local','--local','--config',path.join(E,'wrangler.local.jsonc'),'--persist-to',path.join(E,'local-state'),'--file',file,...(process.env.MG_EVIDENCE_ROOT?['--env-file',path.join(E,'empty.vars')]:[])],{cwd:ROOT,encoding:'utf8',env:{...process.env,CLOUDFLARE_API_TOKEN:'',CLOUDFLARE_API_KEY:'',CLOUDFLARE_EMAIL:'',WRANGLER_SEND_METRICS:'false'}});break;}
+  try{r=execFileSync('npm',['exec','--no','--','wrangler','d1','execute','retroquests-mop-local','--local','--config',path.join(runtime,'wrangler.local.jsonc'),'--persist-to',path.join(runtime,'local-state'),'--file',file,...(process.env.MG_EVIDENCE_ROOT?['--env-file',path.join(runtime,'empty.vars')]:[])],{cwd:ROOT,encoding:'utf8',env:{...process.env,CLOUDFLARE_API_TOKEN:'',CLOUDFLARE_API_KEY:'',CLOUDFLARE_EMAIL:'',WRANGLER_SEND_METRICS:'false'}});break;}
   catch(error){if(attempt===4 || !String(error.stderr).includes('SQLITE_BUSY'))throw error;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,500);}
  }
  fs.appendFileSync(path.join(E,'d1-controls.log'),r);return r;

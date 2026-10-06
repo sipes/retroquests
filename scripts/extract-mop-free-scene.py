@@ -8,6 +8,8 @@ its demo copy additionally removes all hint API calls and paid advancement.
 from pathlib import Path
 import argparse
 import hashlib
+import json
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,6 +117,9 @@ export async function mount(container, adapter, options={}) {
   return {unmount:()=>engine.unmount(),refresh:()=>engine.onPlatformChange(),get state(){return engine.game?structuredClone(engine.game):null;},engine};
 }
 """
+    # Public demo carries only its own objective and attribution, never owned goals.
+    scenes = "export const SCENES = " + json.dumps({'1':{'objective':'Find out what has changed aboard the Hyacinth and leave Deck 9.','keys':['look-arm','badge','vent','shelf-look','coin-vend','wrench','bolts','mop-chute','climb']}}) + ';\n'
+    engine = re.sub(r'export const SCENES = .*?;\n', scenes, engine, count=1, flags=re.S)
     outputs = {'data.js':data, 'rooms.js':rooms, 'art.js':art, 'script.js':script, 'engine.js':engine, 'game.js':game}
     for name, text in outputs.items():
         for forbidden in ['startChapter(2)', 'HANDLERS.cryo', 'HANDLERS.gallery', 'Keypad code for return: 4471', 'gumbo1', 'codecard', 'revealHint(', 'listHints(', '../_shared/', '../games/', '/games/mop-galaxy/']:
