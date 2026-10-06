@@ -54,7 +54,7 @@ export function createMopGalaxyAdapter({fetch:fetcher=(...a)=>globalThis.fetch(.
     if(!keepalive)await refresh();
     if(!state?.user?.verified || !ownerId || ownerId!==state.user.id || snapshot.ownerId!==ownerId)throw changed();
     if(!state.entitlements.includes('mop-galaxy') && !validDemoSave(snapshot))throw new Error('Free-scene save boundary rejected.');
-    try{const expected=revision;const r=await api('PUT','/api/save',{game_id:gameId,version:1,revision:expected,data:snapshot,ownerId},keepalive);if(r.acknowledged!==true || r.revision!==expected+1 || !Number.isInteger(r.updated_at))throw new Error('Save was not acknowledged');revision=Math.max(revision,r.revision);return {updated_at:r.updated_at};}
+    try{const expected=revision;const r=await api('PUT','/api/save',{game_id:gameId,version:1,revision:expected,data:snapshot,ownerId},keepalive);if(r.acknowledged!==true || r.revision!==expected+1 || !Number.isInteger(r.updated_at))throw new Error('Save was not acknowledged');revision=Math.max(revision,r.revision);onState?.(structuredClone(state));return {updated_at:r.updated_at};}
     catch(err){if(err.status===409 && err.code!=='STATE_CHANGED'){conflict=true;onConflict?.(err);}throw err;}
    };
    const previous=queue,result=keepalive?work():queue.then(work);queue=Promise.allSettled([previous,result]).then(()=>{});return result;

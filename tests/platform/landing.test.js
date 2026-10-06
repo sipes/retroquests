@@ -5,12 +5,16 @@ import { createHash } from 'node:crypto';
 import { fixture, call } from './helpers.js';
 const html=readFileSync(new URL('../../public/index.html',import.meta.url),'utf8');
 const home=html.slice(html.indexOf('<main class="wrap" id="home">'),html.indexOf('<main id="gameView"'));
-test('landing identifies the arcade before the original featured adventure',()=>{
-  assert.match(home,/<h1[^>]*>Small pixels\.<br><span>Big adventures\.<\/span><\/h1>/);
-  assert.ok(home.indexOf('arcadeTitle')<home.indexOf('featuredTitle'));
+test('single accessible catalogue replaces duplicated intro, hero and game grid',()=>{
+  assert.match(home,/<h1[^>]*>Choose your next misadventure<\/h1>/);
+  assert.ok(home.indexOf('catalogueTitle')<home.indexOf('featuredTitle'));
+  assert.equal((home.match(/data-slide=/g)||[]).length,3);
+  assert.doesNotMatch(home,/class="intro"|class="hero"|class="games"/);
   assert.match(home,/Your best mate is missing\. The wedding is at four\. There is a goat in your hotel suite, and nobody remembers why\./);
-  for(const id of ['playHero','playCard','buyHero','heroCanvas','cover1','cover2','cover3'])assert.equal((home.match(new RegExp(`id="${id}"`,'g'))||[]).length,1);
-  assert.match(home,/href="#catalogue"/);
+  for(const id of ['playCard','playMopCard','buyHero','heroCanvas','cover2','cover3'])assert.equal((home.match(new RegExp(`id="${id}"`,'g'))||[]).length,1);
+  assert.match(home,/aria-roledescription="carousel"/);
+  assert.match(home,/data-slide="mop-galaxy"[^>]*hidden inert/);
+  assert.match(home,/data-slide="crown"[^>]*hidden inert/);
 });
 test('landing has honest demo, development and planned SKU-specific pricing',()=>{
   assert.match(home,/Eight-chapter adventure/);assert.match(home,/full-game sales are not available yet/);assert.doesNotMatch(home,/Coming 2027|2–3 hours|release gates|processed securely/);

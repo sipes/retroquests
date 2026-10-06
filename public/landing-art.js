@@ -124,4 +124,4 @@ function drawCastleCover(c) {
 }
 
 
-export function drawLandingArt(){drawSuiteCover(document.getElementById('heroCanvas').getContext('2d'));drawSuiteCover(document.getElementById('cover1').getContext('2d'),-20,-30,true);drawStarCover(document.getElementById('cover2').getContext('2d'));drawCastleCover(document.getElementById('cover3').getContext('2d'));}
+export function drawLandingArt(){const draw=(id,fn)=>{const canvas=document.getElementById(id);if(canvas)fn(canvas.getContext('2d'));};draw('heroCanvas',drawSuiteCover);draw('cover1',c=>drawSuiteCover(c,-20,-30,true));draw('cover2',drawStarCover);draw('cover3',drawCastleCover);}

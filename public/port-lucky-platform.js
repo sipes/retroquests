@@ -99,7 +99,7 @@ export function createPortLuckyAdapter({fetch:fetcher=(...args)=>globalThis.fetc
      const expected=revision;
      const r=await api('PUT','/api/save',{game_id:gameId,version:1,revision:expected,data:snapshot,ownerId},keepalive);
      if(r.acknowledged!==true || r.revision!==expected+1 || !Number.isInteger(r.updated_at))throw new Error('Save was not acknowledged');
-     revision=Math.max(revision,r.revision); return {updated_at:r.updated_at};
+     revision=Math.max(revision,r.revision); onState?.(structuredClone(state)); return {updated_at:r.updated_at};
     } catch(err){if(err.status===409 && err.code!=='STATE_CHANGED'){conflict=true;onConflict?.(err);}throw err;}
    };
    // Unload must dispatch now, not wait for an ordinary fetch that may be

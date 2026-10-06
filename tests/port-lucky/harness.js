@@ -5,10 +5,10 @@ import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 export {assert};
-export const EVIDENCE=path.resolve('evidence/port-lucky/browser');fs.mkdirSync(EVIDENCE,{recursive:true});
+export const EVIDENCE=path.resolve(process.env.PL_EVIDENCE || 'evidence/port-lucky','browser');fs.mkdirSync(EVIDENCE,{recursive:true});
 export const BASE=process.env.PL_BASE;
 export const ids={free:'55555555-5555-4555-8555-000000000001',owner:'55555555-5555-4555-8555-000000000002',walkthrough:'55555555-5555-4555-8555-000000000003',other:'55555555-5555-4555-8555-000000000004'};
-export function sql(command){assert(process.env.PL_PERSIST?.includes('/retroquests-port-lucky-integration-v1/.wrangler/port-lucky-isolated-'),'must use isolated DB');const r=spawnSync(path.resolve('node_modules/.bin/wrangler'),['d1','execute','retro-quest-db','--local','--config','dev/platform/wrangler.local.jsonc','--persist-to',process.env.PL_PERSIST,'--env-file','dev/platform/empty.vars','--command',command],{encoding:'utf8',env:process.env});if(r.status!==0)throw new Error(r.stdout+r.stderr);return r.stdout;}
+export function sql(command){assert(process.env.PL_PERSIST?.startsWith(path.resolve('.wrangler/port-lucky-isolated-')),'must use this workspace isolated DB');const r=spawnSync(path.resolve('node_modules/.bin/wrangler'),['d1','execute','retro-quest-db','--local','--config','dev/platform/wrangler.local.jsonc','--persist-to',process.env.PL_PERSIST,'--env-file','dev/platform/empty.vars','--command',command],{encoding:'utf8',env:process.env});if(r.status!==0)throw new Error(r.stdout+r.stderr);return r.stdout;}
 export async function api(kind,route,{method='GET',data}={}){const r=await fetch(new URL(route,BASE),{method,headers:{cookie:'rq_session=pl-session-'+kind,...(data?{'content-type':'application/json'}:{})},body:data?JSON.stringify(data):undefined});return {status:r.status,data:await r.json()};}
 export async function reset(kind){sql(`DELETE FROM saves WHERE user_id='${ids[kind]}';DELETE FROM hint_reveals WHERE user_id='${ids[kind]}';`);}
 export async function seedSave(kind,data){const me=await api(kind,'/api/me');return api(kind,'/api/save',{method:'PUT',data:{game_id:'port-lucky',version:1,revision:me.data.save_envelopes?.['port-lucky']?.revision || 0,data,ownerId:ids[kind]}});}
@@ -25,10 +25,12 @@ export class Session extends SuppliedSession {
   await this.page.evaluate(async()=>{const {host}=await import('/portal.js');Object.defineProperty(window,'__plGame',{configurable:true,get:()=>host.handle});Object.defineProperty(window,'__plAdapter',{configurable:true,get:()=>host.adapter});});
   if(await this.page.locator('#playCard').isVisible())await this.page.click('#playCard');
   else await this.page.evaluate(async()=>{await (await import('/portal.js')).host.start();});
-  await this.page.waitForSelector('.pl-game');await this.page.waitForTimeout(300);
+  await this.page.waitForSelector('.pl-game, .demo-shell');await this.page.waitForTimeout(300);
  }
+ async dismiss(){if(await this.page.locator('.demo-shell').count()){for(let i=0;i<12;i++){const m=this.page.locator('.demo-shell .sierra:not(.death):not(.choice)');if(!await m.count())return;await m.first().click();await this.page.waitForTimeout(40);}return;}return super.dismiss();}
+ async cmd(text){if(await this.page.locator('.demo-shell').count()){await this.dismiss();await this.page.locator('.demo-shell #cmd').fill(text);await this.page.locator('.demo-shell #cmd').press('Enter');this.log.push('> '+text);await this.page.waitForTimeout(3000);await this.dismiss();return;}return super.cmd(text);}
  async reload(){await this.page.reload();await this.play();}
- async setPlayer(player){await this.page.context().clearCookies();if(player!=='anon')await this.page.context().addCookies([{name:'rq_session',value:'pl-session-'+player,url:BASE,httpOnly:true,sameSite:'Lax'}]);this.player=player;await this.page.evaluate(async()=>{const {host}=await import('/portal.js');try{await host.refresh();}catch{}});await this.page.waitForTimeout(600);}
+ async setPlayer(player){await this.page.context().clearCookies();if(player!=='anon')await this.page.context().addCookies([{name:'rq_session',value:'pl-session-'+player,url:BASE,httpOnly:true,sameSite:'Lax'}]);this.player=player;await this.page.evaluate(async()=>{const {host}=await import('/portal.js');try{await host.refresh();}catch{}});await this.page.waitForTimeout(600);if(!await this.page.locator('.pl-game, .demo-shell').count() && player!=='anon'){await this.page.waitForSelector('#home:not([hidden])');assert(await this.page.locator('.hint-text').count()===0,'previous-account private UI removed before explicit relaunch');await this.play();}}
  async shot(label){this.shots++;const f=path.join(EVIDENCE,`${this.name}-${String(this.shots).padStart(2,'0')}-${label}.png`);await this.page.screenshot({path:f});return f;}
  async clickCanvas(x,y){if(!this.touch)return super.clickCanvas(x,y);await this.dismiss();const b=await this.page.locator('.pl-game canvas').boundingBox();await this.page.touchscreen.tap(b.x+x/320*b.width,b.y+y/180*b.height);await this.page.waitForTimeout(1200);}
  async close(){fs.writeFileSync(path.join(EVIDENCE,this.name+'.log'),this.log.join('\n'));fs.writeFileSync(path.join(EVIDENCE,this.name+'-network.json'),JSON.stringify(this.network,null,2));await super.close();}

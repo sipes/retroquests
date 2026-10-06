@@ -3,7 +3,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,writeFileSync,createWriteStream} from 'node:fs';
 import {resolve} from 'node:path';
 import {createHash} from 'node:crypto';
-const root=process.cwd(), evidence=resolve('evidence/port-lucky');mkdirSync(evidence,{recursive:true});mkdirSync('.wrangler',{recursive:true});
+const root=process.cwd(), evidence=resolve(process.env.PL_EVIDENCE || 'evidence/port-lucky');mkdirSync(evidence,{recursive:true});mkdirSync('.wrangler',{recursive:true});
 const persist=mkdtempSync(resolve('.wrangler/port-lucky-isolated-'));
 const config='dev/platform/wrangler.local.jsonc', wrangler=resolve('node_modules/.bin/wrangler'), port=process.env.PL_TEST_PORT || '8796';
 const env={...process.env,WRANGLER_SEND_METRICS:'false',CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:'false',PL_API_BASE:`http://127.0.0.1:${port}`,PL_BASE:`http://127.0.0.1:${port}/`,PL_PERSIST:persist,PL_CHROME:process.env.PL_CHROME || undefined};

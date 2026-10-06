@@ -4,28 +4,38 @@ import {ART as mopDemoArt,drawPlayer as drawWim} from './demos/mop-galaxy/art.js
 import {drawLandingArt} from './landing-art.js';
 import {authProof} from './auth-proof.js';
 import {createPurchaseReturn} from './purchase-return.js';
+import {cataloguePresentation,createCatalogueReader} from './catalogue-state.js';
+import {createCarousel} from './catalogue-carousel.js';
 const $=id=>document.getElementById(id);
 const SKU_GAME='port-lucky',SKU_WALK='port-lucky-walkthrough';
-let account=null,ent={game:false,walk:false},catalog={};
+let account=null,ent={game:false,walk:false},catalog={},authChanging=false;
 let selectedGame='port-lucky',allEntitlements=[];
 const escapeHtml=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(method,path,data){const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const out=await r.json();if(!r.ok)throw Object.assign(new Error(out.error || 'Request failed'),{status:r.status});return out;}
-function applyState(s){const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,allEntitlements])!==JSON.stringify([s.user,s.entitlements]);account=s.user;ent=next;allEntitlements=s.entitlements;catalog=s.catalog;if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
-const hostOptions={container:$('gameMount'),signUp,signIn,onState:applyState,onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}};
+function applyState(s){s={...s,entitlements:s.entitlements || [],catalog:s.catalog || catalog};const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,allEntitlements])!==JSON.stringify([s.user,s.entitlements]);account=s.user;ent=next;allEntitlements=s.entitlements;catalog=s.catalog;for(const [gameId,button] of [['port-lucky','playCard'],['mop-galaxy','playMopCard']]){const p=cataloguePresentation(s,gameId);$(button).textContent=p.action;document.querySelector(`[data-progress="${gameId}"]`).textContent=p.progress;}if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
+const reader=createCatalogueReader(applyState);
+export const carousel=createCarousel($('catalogue'),{blocked:()=>document.body.classList.contains('in-game') || !$('acctMenu').hidden || !!$('modalRoot').children.length || !!$('purchaseReturn')});
+const hostOptions={container:$('gameMount'),signUp,signIn,onState:()=>{refreshCatalogue().catch(()=>{});},onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}};
 const hosts={'port-lucky':createPortLuckyHost({...hostOptions,mount}),'mop-galaxy':createMopGalaxyHost({...hostOptions,mount:mountMop})};
 export let host=hosts[selectedGame];
-function showCatalogue(){document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
+function showCatalogue(reason){if(reason==='access-changed' || reason==='signed-out')reader.invalidate();carousel.selectGame(selectedGame);refreshCatalogue().catch(e=>toast(e.message));document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
 let starting=null;
-function startGame(expectedOwner,gameId=selectedGame,{discardPending=false}={}){const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;starting=(async()=>{try{if(!Object.hasOwn(hosts,gameId))throw new Error('Unknown game');if(gameId!==selectedGame){await host.stop();selectedGame=gameId;host=hosts[gameId];}await refreshMe();if(guarded && (account?.id!==expectedOwner || !account?.verified || !allEntitlements.includes(gameId)))throw new Error('Account or game ownership changed. No automatic resume.');if(!account?.verified && gameId!=='mop-galaxy'){await signIn();return false;}document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;await host.start(guarded?expectedOwner:undefined,{discardPending});$('saveRecovery').hidden=true;return true;}catch(e){toast(e.message);if(host.handle){$('saveRecovery').hidden=false;return false;}await host.stop();showCatalogue();return false;}})().finally(()=>{starting=null;});return starting;}
-async function refreshMe(){await host.refresh();const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);applyState({user:me.user || null,entitlements:me.entitlements || [],catalog:me.catalog || c.catalog});return {user:me.user || null,entitlements:me.entitlements || []};}
-$('playHero').onclick=()=>startGame(undefined,'port-lucky');$('playCard').onclick=()=>startGame(undefined,'port-lucky');$('playMopCard').onclick=()=>startGame(undefined,'mop-galaxy');
+function startGame(expectedOwner,gameId=selectedGame,{discardPending=false}={}){const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;starting=(async()=>{try{if(!Object.hasOwn(hosts,gameId))throw new Error('Unknown game');carousel.selectGame(gameId);carousel.pause();if(gameId!==selectedGame){await host.stop();selectedGame=gameId;host=hosts[gameId];}await refreshMe();if(guarded && (account?.id!==expectedOwner || !account?.verified || !allEntitlements.includes(gameId)))throw new Error('Account or game ownership changed. No automatic resume.');if(!account?.verified && gameId!=='mop-galaxy'){await signIn();return false;}document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;await host.start(guarded?expectedOwner:undefined,{discardPending});$('saveRecovery').hidden=true;return true;}catch(e){toast(e.message);if(host.handle){$('saveRecovery').hidden=false;return false;}await host.stop();showCatalogue();return false;}})().finally(()=>{starting=null;});return starting;}
+export function refreshCatalogue(){if(authChanging)return Promise.resolve(null);return reader.refresh(async()=>{const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);return {user:me.user || null,entitlements:me.entitlements || [],save_envelopes:me.save_envelopes || {},catalog:me.catalog || c.catalog};});}
+async function refreshMe(){try{await host.refresh();}catch(e){if(e.code!=='STATE_CHANGED')throw e;}const s=await refreshCatalogue();if(!s)throw new Error('Account refresh superseded. Try again.');return s;}
+setInterval(()=>{if(!document.hidden && !document.body.classList.contains('in-game'))refreshCatalogue().catch(()=>{});},5000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshCatalogue().catch(()=>{});});
+window.addEventListener('focus',()=>refreshCatalogue().catch(()=>{}));
+function launch(gameId){const p=cataloguePresentation({user:account,entitlements:allEntitlements},gameId);return startGame(p.owned?account.id:undefined,gameId);}
+$('playCard').onclick=()=>launch('port-lucky');$('playMopCard').onclick=()=>launch('mop-galaxy');
 $('logoBtn').onclick=async()=>{try{await host.stop();showCatalogue();}catch(e){toast(e.message);$('saveRecovery').hidden=false;}};
 $('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame(undefined,selectedGame,{discardPending:true});};
 drawLandingArt();
-{const c=$('cover2').getContext('2d'),s={flags:{},inv:['mop']};c.save();c.translate(0,-20);mopDemoArt.closet.bg(c,s);for(const p of mopDemoArt.closet.props(c,s,0))p.d();drawWim(c,236,160,-1,0);c.restore();}
+{const c=$('cover2').getContext('2d'),s={flags:{},inv:['mop']};c.save();mopDemoArt.closet.bg(c,s);for(const p of mopDemoArt.closet.props(c,s,0))p.d();drawWim(c,236,160,-1,0);c.restore();}
 const query=new URLSearchParams(location.search);
 const purchaseResult=query.get('purchase'),purchaseSku=query.get('sku');
-function purchaseStatus({text,retry=false,play=false}){
+if(query.has('purchase') && ['port-lucky','port-lucky-walkthrough','mop-galaxy','mop-galaxy-walkthrough'].includes(purchaseSku))carousel.selectGame(purchaseSku.startsWith('mop-galaxy')?'mop-galaxy':'port-lucky');
+function purchaseStatus({text,retry=false,play=false}){carousel.pause();
  let panel=$('purchaseReturn');if(!panel){panel=document.createElement('section');panel.id='purchaseReturn';panel.className='overlay-card';panel.setAttribute('aria-label','Purchase return');$('home').prepend(panel);}
  panel.replaceChildren();const message=document.createElement('p');message.setAttribute('role','status');message.textContent=text;panel.append(message);
  if(retry){const b=document.createElement('button');b.className='btn';b.textContent='Check ownership again';b.onclick=()=>purchaseReturn.run(purchaseResult,purchaseSku,{retry:true});panel.append(b);}
@@ -47,7 +57,7 @@ function modal(html, onClose) {
   const observer = new MutationObserver(() => { if (!v.isConnected) close(); });
   observer.observe($('modalRoot'), { childList: true });
   v.addEventListener('click', e => { if (e.target === v) close(); });
-  $('modalRoot').appendChild(v);
+  carousel.pause();$('modalRoot').appendChild(v);
   return { el: v, close };
 }
 
@@ -112,8 +122,8 @@ function renderNav() {
     const si = document.createElement('button'); si.className = 'btn small ghost'; si.textContent = 'Sign in'; si.onclick = () => signIn(); n.appendChild(si);
     const b = document.createElement('button'); b.className = 'btn small'; b.textContent = 'Sign up free'; b.onclick = () => signUp(); n.appendChild(b);
   } else {
-    const b = document.createElement('button'); b.className = 'btn small ghost'; b.textContent = account.name; b.setAttribute('aria-expanded', 'false');
-    b.onclick = () => { const m = $('acctMenu'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); renderMenu(); };
+    const b = document.createElement('button'); b.className = 'btn small ghost'; b.textContent = account.name; b.title=account.name; b.setAttribute('aria-expanded', 'false');
+    b.onclick = () => { carousel.pause();const m = $('acctMenu'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); renderMenu(); };
     n.appendChild(b);
   }
 }
@@ -127,7 +137,7 @@ function renderMenu() {
     <div class="owned">Mop walkthrough: <b>${allEntitlements.includes('mop-galaxy-walkthrough') ? 'owned' : 'not owned'}</b></div>`;
   if (account.isAdmin) { const a = document.createElement('a'); a.className = 'btn small alt'; a.href = '/admin.html'; a.textContent = 'Admin'; a.style.textDecoration = 'none'; m.appendChild(a); }
   const out = document.createElement('button'); out.className = 'btn small ghost'; out.textContent = 'Sign out';
-  out.onclick = async () => {try {await api('POST','/api/logout');await refreshMe();m.hidden=true;toast('Signed out. Unsaved in-memory progress cleared.');} catch(e){toast(e.message);} };
+  out.onclick = async () => {try {authChanging=true;reader.invalidate();await api('POST','/api/logout');authChanging=false;reader.invalidate();await refreshMe();m.hidden=true;toast('Signed out. Unsaved in-memory progress cleared.');} catch(e){toast(e.message);}finally{authChanging=false;refreshCatalogue().catch(()=>{});} };
   const del = document.createElement('button'); del.className = 'btn small ghost'; del.textContent = 'Delete my account';
   del.onclick = () => { m.hidden = true; deleteAccount(); };
   m.append(out, del);
@@ -142,8 +152,9 @@ function deleteAccount() {
   md.el.querySelector('#delNo').focus();
   md.el.querySelector('#delForm').addEventListener('submit', async e => {
     e.preventDefault();
-    try { await api('DELETE', '/api/account', { confirm: md.el.querySelector('#delEmail').value }); md.close(); await refreshMe(); toast('Your account has been deleted.'); }
+    try { authChanging=true;reader.invalidate();await api('DELETE', '/api/account', { confirm: md.el.querySelector('#delEmail').value }); authChanging=false;reader.invalidate();md.close(); await refreshMe(); toast('Your account has been deleted.'); }
     catch (x) { md.el.querySelector('#delErr').textContent = x.message; }
+    finally {authChanging=false;refreshCatalogue().catch(()=>{});}
   });
 }
 document.addEventListener('click', e => { const m = $('acctMenu'); if (!m.hidden && !m.contains(e.target) && !$('nav').contains(e.target)) m.hidden = true; });
