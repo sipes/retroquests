@@ -3,6 +3,7 @@
 // Mailtrap emails, paid hints served from the server, and an admin API.
 
 import { CATALOG, GAMES } from './catalog.js';
+import {validHistory} from '../public/scene-history.js';
 import { sendEmail, emails } from './email.js';
 import { createCheckout, verifyStripeSignature } from './stripe.js';
 
@@ -315,7 +316,7 @@ async function deleteAccount(req, env) {
 const MOP_FREE_ITEMS = new Set(['mop','mymop','badge','coin','snakpak','wrapper','wrench','granules']);
 const MOP_FREE_FLAGS = new Set(['lookedArm','gotBadge','sawBoarders','sawWrench','shelfWedged','gotWrench','vended','grilleOpen','mopChuted','tookMymop','leftDeck9']);
 const MOP_FREE_POINTS = {'look-arm':1,badge:2,vent:3,'shelf-look':1,'coin-vend':2,wrench:3,bolts:3,'mop-chute':3,climb:2};
-const MOP_FREE_FIELDS = new Set(['v','ownerId','chapter','room','inv','flags','scored','score','hintsUsed','revealed','px','py','dir','started','clock','checkpoint','done']);
+const MOP_FREE_FIELDS = new Set(['v','ownerId','chapter','room','inv','flags','scored','score','hintsUsed','revealed','px','py','dir','started','clock','checkpoint','history','done']);
 const plainObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const flagValue = v => typeof v === 'boolean' || v === 0 || v === 1;
 function validMopFreeSave(s, ownerId, depth = 0) {
@@ -332,6 +333,7 @@ function validMopFreeSave(s, ownerId, depth = 0) {
       ['px','py'].some(k => !Number.isFinite(s[k]) || s[k] < 0 || s[k] > (k === 'px' ? 320 : 180)) ||
       (s.dir !== 1 && s.dir !== -1) || typeof s.started !== 'boolean' ||
       s.done !== false || s.clock !== null) return false;
+  if (s.history != null && (depth > 0 || !validHistory(s.history,s,{id:'mop-galaxy',scenes:{1:{}},rooms:{closet:{},deck9:{}},items:Object.fromEntries([...MOP_FREE_ITEMS].map(i=>[i,{}]))}) || !Object.values(s.history.starts).every(cp=>validMopFreeSave(cp,ownerId,1)))) return false;
   return s.checkpoint === undefined || s.checkpoint === null || (depth === 0 && validMopFreeSave(s.checkpoint, ownerId, 1));
 }
 async function putSave(req, env) {

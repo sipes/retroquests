@@ -1,12 +1,13 @@
 // Shared gameplay contract for current games and future mounts. No story/hint data.
+import {showSceneProgress} from './scene-history.js';
 export const VERBS = Object.freeze([['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']].map(Object.freeze));
-export function scoreDisplay(game, scenes, points) {
+export function scoreDisplay(game, scenes, points, maxScore=250) {
   const scored=game.scored || {}, keys=scenes[game.chapter]?.keys;
   const awarded=Object.entries(scored).filter(([,v])=>v);
   const known=awarded.every(([k])=>Object.hasOwn(points,k));
   const reconstructed=awarded.reduce((n,[k])=>n+(points[k] || 0),0);
   const scene=keys && known && reconstructed===game.score ? keys.reduce((n,k)=>n+(scored[k]?points[k]:0),0) : 'unknown';
-  return `Scene: ${scene} | Total: ${game.score}`;
+  return `Scene: ${scene} / ${scenes[game.chapter]?.max ?? 'unknown'} | Total: ${game.score} / ${maxScore}`;
 }
 const PREF='rq-music-muted';
 // Original eight-bar C-major melody and bass composed for Retro Quests.
@@ -49,6 +50,8 @@ export function installGameplayControls(engine, scenes) {
   const active=()=>!engine.destroyed && !engine.paused && engine.view==='game' && !!engine.game;
   const hidden=()=>doc.hidden || controller.backgrounded;
   const listen=(target,type,fn,opts)=>{target.addEventListener(type,fn,opts);listeners.push([target,type,fn,opts]);};
+  listen(doc,'keydown',ev=>{if(engine.rewindPending){ev.preventDefault();ev.stopImmediatePropagation();}},true);
+  for(const type of ['click','submit','keydown','pointerdown','pointerup'])listen(host,type,ev=>{if(engine.rewindPending){ev.preventDefault();ev.stopImmediatePropagation();}},true);
   const rail=host.querySelector('.side-actions');
   const button=(id,label,text)=>{const b=doc.createElement('button');b.type='button';b.className='btn ghost';b.dataset.rqUtility=id;b.setAttribute('aria-label',label);b.title=label;b.textContent=text;return b;};
   const mute=button('mute','Mute music','♪ Mute'),objective=button('objective','Scene objective','◎ Goal');
@@ -56,6 +59,7 @@ export function installGameplayControls(engine, scenes) {
   const legacy=!!get('sideTypeBtn');
   const ids=legacy?['sideStuckBtn','sideRestartBtn','sideExitBtn','sideInvBtn']:['sideStuck','sideRestart','sideExit','sideItems'];
   const top=host.querySelector('.game-top .cta-row') || host.querySelector('.game-top') || host.querySelector('.topbar');
+  if(engine.sceneConfig){const progress=button('scenes','Scene progress','Scenes');progress.classList.add('rq-scenes');progress.onclick=()=>showSceneProgress(engine);top?.append(progress);}
   if(rail){
     for(const id of legacy?['sideTypeBtn','sideFsBtn']:['sideType','sideFs']){const b=get(id);if(b){b.classList.add('rq-nonrail');(top || rail.parentNode).append(b);}}
     const existing=ids.map(get);existing.forEach((b,i)=>{if(!b)return;b.dataset.rqUtility=['stuck','restart','exit','items'][i];b.setAttribute('aria-label',['Stuck?','Restart scene','Exit game','Items'][i]);b.title=b.getAttribute('aria-label');const icon=doc.createElement('span');icon.textContent=['?','↻','←','▣'][i];icon.setAttribute('aria-hidden','true');b.prepend(icon);});
@@ -86,7 +90,12 @@ export function installGameplayControls(engine, scenes) {
     const m=engine.modal(html);m.el.querySelector('p').textContent=goal;m.el.querySelector('[data-rq-close]').onclick=m.close;m.el.querySelector('button').focus();
   };
   const style=doc.createElement('style');style.textContent=`
-  .rq-nonrail{min-width:44px;min-height:44px}.rq-utilities{display:flex;gap:6px}.rq-utilities button{min-height:44px}
+  .rq-nonrail,.rq-scenes{min-width:44px;min-height:44px}.rq-utilities{display:flex;gap:6px}.rq-utilities button{min-height:44px}
+  .rq-scene-dialog{box-sizing:border-box;max-height:calc(100dvh - 16px);overflow:auto;overflow-wrap:anywhere}
+  .rq-scene-dialog button{min-height:44px;min-width:44px;white-space:normal}
+  .rq-scene-dialog ol{padding-left:22px}.rq-scene-dialog li{margin-bottom:8px}
+  .rq-scene-dialog li button{width:100%;text-align:left}
+  .rq-scene-dialog button:focus-visible{outline:2px solid #00d5ed;outline-offset:3px}
   .pl-game .side-actions,.demo-shell .side-actions{display:flex;gap:6px;grid-column:1/-1}
   .pl-game .side-actions>[data-rq-utility],.demo-shell .side-actions>[data-rq-utility]{min-height:44px}
   @media (pointer:fine){

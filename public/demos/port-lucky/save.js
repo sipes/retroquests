@@ -1,4 +1,5 @@
 // Safe free-scene schema. Contains no paid-room names or hint/solution text.
+import {validHistory} from '../../scene-history.js';
 const object=v=>v!==null && typeof v==='object' && !Array.isArray(v);
 const flags=new Set(['minibarOpen','gotCrackers','goatFed','gotTicket','leftSuite','calledDesk']);
 const scored=new Set(['feed','arm','minibar','crackers','ticket','tuba','desk','door']);
@@ -13,10 +14,13 @@ export function validDemoSave(s){
   && (s.hintsUsed===undefined || s.hintsUsed===0)
   && ['px','py'].every(k=>s[k]===undefined || (Number.isFinite(s[k])&&s[k]>=0&&s[k]<=(k==='px'?320:180)))
   && (s.dir===undefined || s.dir===1 || s.dir===-1)
-  && (!s.checkpoint || validDemoSave({...s.checkpoint,checkpoint:null}));
+  && (!s.checkpoint || (!s.checkpoint.checkpoint && !s.checkpoint.history && validDemoSave(s.checkpoint)))
+  && (!s.history || (validHistory(s.history,s,{id:'port-lucky',scenes:{1:{}},rooms:{suite:{}},items:{crackers:{},keycard:{},ticket:{}}}) && Object.values(s.history.starts).every(cp=>validDemoSave(cp))));
 }
 export function demoSave(s){
  if(!validDemoSave(s))throw new Error('Unsupported or invalid save retained. No automatic reset; contact the platform owner.');
  // Keep the legacy shape consumed by the unchanged full-game migration.
- return {room:'suite',inv:[...s.inv],flags:{...s.flags},scored:{...s.scored},score:s.score,hintsUsed:0,revealed:{},px:s.px??150,py:s.py??160,dir:s.dir??1,started:!!s.started};
+ const out={room:'suite',inv:[...s.inv],flags:{...s.flags},scored:{...s.scored},score:s.score,hintsUsed:0,revealed:{},px:s.px??150,py:s.py??160,dir:s.dir??1,started:!!s.started};
+ for(const key of ['v','chapter','ownerId','clock','done','history','checkpoint'])if(s[key]!==undefined)out[key]=structuredClone(s[key]);
+ return out;
 }

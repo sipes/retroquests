@@ -1,7 +1,8 @@
 // Scene 1 raw v2 save validator/projection. The bridge owns the separate
 // {version:1, revision, data} CAS envelope; pass only envelope.data here.
+import {validHistory} from '../../scene-history.js';
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
-const fields = new Set(['v','ownerId','chapter','room','inv','flags','scored','score','hintsUsed','revealed','px','py','dir','started','clock','checkpoint','done']);
+const fields = new Set(['v','ownerId','chapter','room','inv','flags','scored','score','hintsUsed','revealed','px','py','dir','started','clock','checkpoint','history','done']);
 const items = new Set(['mop','mymop','badge','coin','snakpak','wrapper','wrench','granules']);
 const flags = new Set(['lookedArm','gotBadge','sawBoarders','sawWrench','shelfWedged','gotWrench','vended','grilleOpen','mopChuted','tookMymop','leftDeck9']);
 const points = {'look-arm':1,badge:2,vent:3,'shelf-look':1,'coin-vend':2,wrench:3,bolts:3,'mop-chute':3,climb:2};
@@ -18,6 +19,7 @@ function valid(s, checkpoint = false) {
   if (!['px','py'].every(k => Number.isFinite(s[k]) && s[k] >= 0 && s[k] <= (k === 'px' ? 320 : 180))) return false;
   if (![1,-1].includes(s.dir) || typeof s.started !== 'boolean' || s.clock !== null || s.done !== false) return false;
   if (s.checkpoint != null && (checkpoint || !valid(s.checkpoint,true) || (s.ownerId && s.checkpoint.ownerId && s.ownerId !== s.checkpoint.ownerId))) return false;
+  if (s.history != null && (checkpoint || !validHistory(s.history,s,{id:'mop-galaxy',scenes:{1:{}},rooms:{closet:{},deck9:{}},items:Object.fromEntries([...items].map(i=>[i,{}]))}) || !Object.values(s.history.starts).every(cp=>valid(cp,true)))) return false;
   return true;
 }
 export const validDemoSave = s => valid(s);
@@ -26,5 +28,6 @@ export function demoSave(s) {
   const out = {v:2,chapter:1,room:s.room,inv:[...s.inv],flags:{...s.flags},scored:{...s.scored},score:s.score,hintsUsed:0,revealed:{},px:s.px,py:s.py,dir:s.dir,started:s.started,clock:null,checkpoint:null,done:false};
   if (s.ownerId !== undefined) out.ownerId = s.ownerId;
   if (s.checkpoint != null) out.checkpoint = demoSave(s.checkpoint);
+  if (s.history != null) out.history = structuredClone(s.history);
   return out;
 }

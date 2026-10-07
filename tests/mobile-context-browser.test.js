@@ -10,7 +10,7 @@ for(const game of ['port-lucky','mop-galaxy'])for(const mode of ['games','demos'
  const server=createServer((req,res)=>{
   const p=new URL(req.url,'http://localhost').pathname;
   if(p==='/'){res.setHeader('content-type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><div id="game"></div>');return;}
-  if(!['/context-input.js','/gameplay-controls.js'].includes(p) && !/^\/(games|demos)\/(port-lucky|mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
+  if(!['/context-input.js','/gameplay-controls.js','/scene-history.js'].includes(p) && !/^\/(games|demos)\/(port-lucky|mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
   const file=resolve('public','.'+p);if(!existsSync(file)){res.writeHead(404);res.end();return;}
   res.setHeader('content-type',p.endsWith('.css')?'text/css':'text/javascript');res.end(readFileSync(file));
  });

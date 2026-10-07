@@ -3,7 +3,7 @@ import {ITEMS, POINTS, SAVE_VERSION} from './data.js';
 import {demoSave} from './save.js';
 const CH_POS = {1:['closet',150,160,1]};
 export function CHAPTER_START(n) { if (n !== 1) throw new Error('Scene boundary'); return {v:SAVE_VERSION,chapter:1,room:'closet',inv:['mop'],flags:{},scored:{},score:0,hintsUsed:0,revealed:{},px:150,py:160,dir:1,started:true,clock:null,checkpoint:null,done:false}; }
-export function migrateSave(s) { const g = demoSave(s); if (!g.checkpoint) g.checkpoint = CHAPTER_START(1); return g; }
+export function migrateSave(s) { return demoSave(s); }
 export function createScript(E) {
   const say = (t, then) => E.say(t, then);
   const pts = k => E.points(k);
@@ -15,10 +15,11 @@ export function createScript(E) {
     if (n !== 1) throw new Error('Scene boundary');
     const g = G(); const [room, px, py, dir] = CH_POS[n];
     g.chapter = n; g.room = room; g.px = px; g.py = py; g.dir = dir; g.started = true; g.clock = null;
+    if (opts.fresh) give('mop');
     E.clearTransient(); E.clearOverlays(); E.view = 'game'; E.$('gate').hidden = true; E.$('stage').hidden = false;
     E.setCheckpoint(); E.renderInv(); E.updateHud(); E.updateClockUI(); E.persist();
     if (n === 1) {
-      if (opts.fresh) { give('mop'); E.setCheckpoint(); say('The Luminous Hyacinth, fourteen months out. You wake up on a sack of absorbent granules in the Deck 9 supply closet because you are not crew and crew get bunks.'); say('Something has changed. The engine note is wrong, the corridor door is sealed, and Mop, the floor-polishing robot, is standing over you saying "Wim! Wim! I signed for a delivery!"'); say('Click a verb, then click something in the room. Or type commands like LOOK AT MOP. Save often. This is that kind of ship.'); }
+      if (opts.fresh) { say('The Luminous Hyacinth, fourteen months out. You wake up on a sack of absorbent granules in the Deck 9 supply closet because you are not crew and crew get bunks.'); say('Something has changed. The engine note is wrong, the corridor door is sealed, and Mop, the floor-polishing robot, is standing over you saying "Wim! Wim! I signed for a delivery!"'); say('Click a verb, then click something in the room. Or type commands like LOOK AT MOP. Save often. This is that kind of ship.'); }
       return;
     }
   }

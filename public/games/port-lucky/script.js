@@ -50,13 +50,12 @@ export function migrateSave(sv) {
     g.chapter = ROOM_CHAPTER[g.room] || 1;
     if (g.flags && g.flags.demoDone) { g.flags.demoDone = false; } // the demo "ending" is now the start of chapter 3
     g.money = 0; g.quarters = 0; g.clock = null; g.done = false;
-    g.checkpoint = CHAPTER_START(g.chapter);
-    g.checkpoint.hintsUsed = g.hintsUsed || 0;
+
   }
   if (!g.flags) g.flags = {}; if (!g.scored) g.scored = {}; if (!g.inv) g.inv = []; if (!g.revealed) g.revealed = {};
   if (typeof g.money !== 'number') g.money = 0; if (typeof g.quarters !== 'number') g.quarters = 0;
   if (!g.chapter) g.chapter = ROOM_CHAPTER[g.room] || 1;
-  if (!g.checkpoint) g.checkpoint = CHAPTER_START(g.chapter);
+
   if (g.chapter === 7 && (g.clock == null)) g.clock = 720;
   return g;
 }

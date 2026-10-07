@@ -8,6 +8,7 @@ import { createScript, CHAPTER_START, migrateSave } from './script.js';
 import { TEMPLATE } from './template.js';
 
 import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';
+import {installSceneRuntime, allocateSceneScores} from '../../scene-history.js';
 export const SCENES = {
   "1": {
     "objective": "Get your bearings after last night and find a way out of the honeymoon suite.",
@@ -113,6 +114,7 @@ export const SCENES = {
     ]
   }
 };
+allocateSceneScores(SCENES, POINTS, CHAPTERS, [[['phone-back'],['phone-back-dolphin','nadia-dolphin']],[['speech-honest'],['speech-ok']]]);
 const CLOCK_RATE = 3;          // game-seconds per real second in chapter 7 (12 game-minutes = 4 real minutes)
 const CLOCK_START = 12 * 60;   // seconds
 
@@ -128,6 +130,7 @@ export class Engine {
     this.settings = { wait10: true };
     try { const s = JSON.parse(localStorage.getItem('rq-port-lucky-settings') || 'null'); if (s && typeof s.wait10 === 'boolean') this.settings = s; } catch (e) {}
     this.script = createScript(this);
+    installSceneRuntime(this,{id:GAME_ID,scenes:SCENES,rooms:ROOMS,items:ITEMS,roomChapter:ROOM_CHAPTER});
   }
 
   // ---------- Mount / unmount ----------
@@ -208,17 +211,7 @@ export class Engine {
   newGame() {
     return { v: SAVE_VERSION, chapter: 1, room: 'suite', inv: [], flags: {}, scored: {}, score: 0, hintsUsed: 0, revealed: {}, px: 150, py: 160, dir: 1, started: false, money: 0, quarters: 0, clock: null, checkpoint: null, done: false };
   }
-  snapshot() { const g = JSON.parse(JSON.stringify(this.game)); delete g.checkpoint; return g; }
-  setCheckpoint() { this.game.checkpoint = this.snapshot(); }
-  restartScene() {
-    const g = this.game; if (!g) return;
-    const cp = g.checkpoint || CHAPTER_START(g.chapter);
-    const keep = { hintsUsed: g.hintsUsed, revealed: g.revealed };
-    this.game = Object.assign(JSON.parse(JSON.stringify(cp)), keep, { checkpoint: cp });
-    this.clearTransient(); this.clearOverlays();
-    this.renderInv(); this.updateHud(); this.updateClockUI(); this.persist();
-    this.script.onRestart(this.game.chapter);
-  }
+  // snapshot/setCheckpoint/restartScene are installed by the shared history contract.
   clearTransient() { this.context?.clear(); this.msgQueue = []; this.msgOpen = false; this.blocking = false; this.choiceOpen = false; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.selItem = null; }
   clearOverlays() { this.context?.clear(); if (!this.root) return; this.root.querySelectorAll('[data-id="view"] .sierra, [data-id="view"] .overlay-card, .modal-veil').forEach(n => n.remove()); this.modalCount = 0; this.blocking = false; this.msgOpen = false; this.choiceOpen = false; }
 
@@ -228,16 +221,7 @@ export class Engine {
     if (!this.account || !this.game) return;
     clearTimeout(this.saveTimer); this.saveTimer = setTimeout(() => this.flushSave(false), 800);
   }
-  flushSave(keepalive) {
-    clearTimeout(this.saveTimer);
-    if (!this.account || !this.game) return Promise.resolve();
-    if (this.game.ownerId && this.game.ownerId !== this.account.id) return Promise.resolve(); // never write one account's progress into another
-    const data = JSON.parse(JSON.stringify(this.game));
-    this.setSaveState('saving');
-    let p;
-    try { p = Promise.resolve(this.adapter.save(GAME_ID, data, { keepalive: !!keepalive, ownerId: this.game.ownerId || this.account.id })); } catch (e) { p = Promise.reject(e); }
-    return p.then(() => this.setSaveState('saved')).catch(e => { this.lastSaveError = e; this.setSaveState('failed'); });
-  }
+  // flushSave is installed by the shared history contract (serial acknowledgement barrier).
   setSaveState(s) {
     this.saveState = s; const el = this.$ && this.$('savestate'); if (!el) return;
     el.className = 'savestate ' + s;
@@ -281,15 +265,18 @@ export class Engine {
     const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Try again';
     const restart = document.createElement('button'); restart.type = 'button'; restart.textContent = 'Restart scene';
     a.append(again, restart); box.appendChild(a);
-    again.onclick = e => { e.stopPropagation(); box.remove(); const cp = this.game.checkpoint; this.game = Object.assign(JSON.parse(JSON.stringify(snap)), { checkpoint: cp, hintsUsed: this.game.hintsUsed, revealed: this.game.revealed }); this.clearTransient(); this.renderInv(); this.updateHud(); this.updateClockUI(); this.persist(); this.refocus(); };
+    again.onclick = e => { if(this.rewindPending)return; e.stopPropagation(); box.remove(); const cp = this.game.checkpoint; this.game = Object.assign(JSON.parse(JSON.stringify(snap)), { history:this.game.history, checkpoint: cp, hintsUsed: this.game.hintsUsed, revealed: this.game.revealed }); this.clearTransient(); this.lastSnap=null; this.renderInv(); this.updateHud(); this.updateClockUI(); this.persist(); this.refocus(); };
     restart.onclick = e => { e.stopPropagation(); box.remove(); this.restartScene(); };
     this.msgQueue = []; this.blocking = true; view.appendChild(box); again.focus();
   }
   overlay(html) { this.context?.clear(); const o = document.createElement('div'); o.className = 'overlay-card'; o.innerHTML = html; this.$('view').appendChild(o); this.blocking = true; return o; }
   modal(html) { this.context?.clear();
     const v = document.createElement('div'); v.className = 'modal-veil'; v.innerHTML = html; this.modalCount++;
-    const close = () => { if (!v.isConnected) return; v.remove(); this.modalCount--; document.removeEventListener('keydown', esc); this.refocus(); };
+    const cleanup = () => { document.removeEventListener('keydown', esc); observer.disconnect(); };
+    const close = () => { cleanup(); if (!v.isConnected) return; v.remove(); this.modalCount--; this.refocus(); };
     const esc = e => { if (e.key === 'Escape') close(); };
+    const observer = new MutationObserver(() => { if (!v.isConnected) cleanup(); });
+    observer.observe(this.container,{childList:true,subtree:true});
     document.addEventListener('keydown', esc); v.addEventListener('click', e => { if (e.target === v) close(); });
     this.$('modalroot').appendChild(v); return { el: v, close };
   }
@@ -315,7 +302,7 @@ export class Engine {
   gotoRoom(id, px, py, dir) { this.context?.clear(); this.game.room = id; this.game.px = px; this.game.py = py; this.game.dir = dir || 1; this.walkTarget = null; this.walkThen = null; this.bgKey = ''; this.updateHud(); this.persist(); }
   updateHud() {
     const g = this.game; if (!g || !this.root) return;
-    this.$('score').textContent = scoreDisplay(g, SCENES, POINTS);
+    this.$('score').textContent = scoreDisplay(g, SCENES, POINTS, MAX_SCORE);
     this.$('roomtxt').textContent = this.room().title;
     this.$('hints').textContent = `Hints: ${g.hintsUsed}`;
     const inv = this.$('invcount'); if (inv) inv.textContent = g.inv.length;
@@ -349,7 +336,7 @@ export class Engine {
     const key = g.room + JSON.stringify(g.flags);
     if (key !== this.bgKey) { this.bx.clearRect(0, 0, 320, 180); art.bg(this.bx, g); this.bgKey = key; }
     this.cx.drawImage(this.bg, 0, 0);
-    if (this.walkTarget && !this.msgOpen && !this.blocking) {
+    if (this.walkTarget && !this.msgOpen && !this.blocking && !this.modalCount) {
       const dx = this.walkTarget[0] - g.px, dy = this.walkTarget[1] - g.py, d = Math.hypot(dx, dy), sp = 1.6;
       if (d <= sp) { g.px = this.walkTarget[0]; g.py = this.walkTarget[1]; this.walkTarget = null; const f = this.walkThen; this.walkThen = null; if (f) f(); }
       else { g.px += dx / d * sp; g.py += dy / d * sp; if (Math.abs(dx) > .5) g.dir = dx > 0 ? 1 : -1; }

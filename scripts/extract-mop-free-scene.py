@@ -17,7 +17,7 @@ SOURCE = ROOT / 'public/games/mop-galaxy'
 OUTPUT = ROOT / 'public/demos/mop-galaxy'
 HASHES = {
     'data.js': '777ecd1b566bae3d039ecef2c8f48243ebe89d2003b7e5b43c4a907ec9d5ef76',
-    'script.js': '9feb9deb2c30a70a974c98570d15c2045b43199bc6ce07b83b7e9db2fc7c62a4',
+    'script.js': '7787ea43d8896c732433dddaa76c66313dfe3e5f03f288d2d7b0b10c2de164a5',
     'rooms.js': '552d9b8daa26fb70dd59263260b2d522f783e8c9e48f1523fd23825678d36937',
     'art.js': '2ed04c1c2e62e56b15a8f69a62deab3a43ab5633fff738a1d3e44c9d391c3637',
 }
@@ -31,13 +31,16 @@ def extract():
         if name == 'rooms.js': raw = raw.split(b'\n// Approved presentation-only contextual actions (mobile-context-v1).')[0]
         if hashlib.sha256(raw).hexdigest() != expected:
             raise ValueError(f'{name}: source changed; re-review free-scene slices before extracting')
-        sources[name] = raw.decode().splitlines(keepends=True)
+        text = raw.decode()
+        # Reviewed runtime-only insertion; preserve supplier slice line numbers.
+        if name == 'script.js': text = text.replace("    if (n === 1 && opts.fresh) give('mop');\n", '')
+        sources[name] = text.splitlines(keepends=True)
 
     def part(name, first, last):
         return ''.join(sources[name][first - 1:last])
 
     data = part('data.js', 1, 17) + '};\n'
-    data += "export const ROOM_CHAPTER = {closet:1, deck9:1};\nexport const PUZZLES = {\n"
+    data += "export const CHAPTERS = [{n:1,title:'Deck 9, Custodial'}];\nexport const ROOM_CHAPTER = {closet:1, deck9:1};\nexport const PUZZLES = {\n"
     data += part('data.js', 66, 71) + '};\nPUZZLES.deck9 = PUZZLES.closet;\n'
     data += 'export const POINTS = {\n' + part('data.js', 121, 121).rstrip().rstrip(',') + '\n};\n'
 
@@ -62,11 +65,11 @@ ROOMS.closet.spots.find(s=>s.id==='shelves').actions.splice(1,0,{label:'Search',
     script = "import {ITEMS, POINTS, SAVE_VERSION} from './data.js';\nimport {demoSave} from './save.js';\n"
     script += "const CH_POS = {1:['closet',150,160,1]};\n"
     script += "export function CHAPTER_START(n) { if (n !== 1) throw new Error('Scene boundary'); return {v:SAVE_VERSION,chapter:1,room:'closet',inv:['mop'],flags:{},scored:{},score:0,hintsUsed:0,revealed:{},px:150,py:160,dir:1,started:true,clock:null,checkpoint:null,done:false}; }\n"
-    script += 'export function migrateSave(s) { const g = demoSave(s); if (!g.checkpoint) g.checkpoint = CHAPTER_START(1); return g; }\n'
+    script += 'export function migrateSave(s) { return demoSave(s); }\n'
     script += part('script.js', 60, 66)
     script += "  function startChapter(n, opts = {}) {\n    if (n !== 1) throw new Error('Scene boundary');\n"
     script += part('script.js', 80, 81).replace('n === 8 ? CLOCK_START : null', 'null')
-    script += part('script.js', 86, 91) + '  }\n'
+    script += "    if (opts.fresh) give('mop');\n" + part('script.js', 86, 91) + '  }\n'
     script += "  function onRestart() { say('You wake up on the sack of granules. Again. Mop is still very excited about the delivery.'); }\n"
     script += "  const WALK_USE = {closet:['door','chute'],deck9:['closetdoor','ladder','grille']};\n  const walkAction = id => (WALK_USE[G().room] || []).includes(id);\n  const itemLook = id => ITEMS[id].look;\n  const itemLabel = () => null;\n  const HANDLERS = {};\n"
     script += part('script.js', 148, 155).replace("    if (v !== 'look' && tickTimers()) return;\n", '').replace("    if (g.room === 'collar' && v !== 'look') F().tick = (F().tick || 0) + 1;\n", '')
@@ -118,8 +121,10 @@ export async function mount(container, adapter, options={}) {
 }
 """
     # Public demo carries only its own objective and attribution, never owned goals.
-    scenes = "export const SCENES = " + json.dumps({'1':{'objective':'Find out what has changed aboard the Hyacinth and leave Deck 9.','keys':['look-arm','badge','vent','shelf-look','coin-vend','wrench','bolts','mop-chute','climb']}}) + ';\n'
+    scenes = "export const SCENES = " + json.dumps({'1':{'max':20,'name':'Deck 9, Custodial','objective':'Find out what has changed aboard the Hyacinth and leave Deck 9.','keys':['look-arm','badge','vent','shelf-look','coin-vend','wrench','bolts','mop-chute','climb']}}) + ';\n'
     engine = re.sub(r'export const SCENES = .*?;\n', scenes, engine, count=1, flags=re.S)
+    engine = re.sub(r'^allocateSceneScores\(.*?\);\n', '', engine, flags=re.M)
+    engine = engine.replace('roomChapter:ROOM_CHAPTER}', "roomChapter:ROOM_CHAPTER,completedFlag:'leftDeck9'}")
     outputs = {'data.js':data, 'rooms.js':rooms, 'art.js':art, 'script.js':script, 'engine.js':engine, 'game.js':game}
     for name, text in outputs.items():
         for forbidden in ['startChapter(2)', 'HANDLERS.cryo', 'HANDLERS.gallery', 'Keypad code for return: 4471', 'gumbo1', 'codecard', 'revealHint(', 'listHints(', '../_shared/', '../games/', '/games/mop-galaxy/']:

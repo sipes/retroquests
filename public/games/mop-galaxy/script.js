@@ -51,7 +51,7 @@ export function migrateSave(sv) {
   if (!g.flags) g.flags = {}; if (!g.scored) g.scored = {}; if (!g.inv) g.inv = []; if (!g.revealed) g.revealed = {};
   if (!g.chapter) g.chapter = ROOM_CHAPTER[g.room] || 1;
   if (!g.room || !ROOM_CHAPTER[g.room]) { const cp = CHAPTER_START(g.chapter); g.room = cp.room; g.px = cp.px; g.py = cp.py; }
-  if (!g.checkpoint) g.checkpoint = CHAPTER_START(g.chapter);
+
   if (g.chapter === 8 && g.clock == null && !g.flags.okonjoAwake) g.clock = CLOCK_START;
   if (typeof g.done !== 'boolean') g.done = false;
   return g;
@@ -83,10 +83,11 @@ export function createScript(E) {
     if (n === 2) g.flags.sweepOn = 1;
     if (n === 3 && !g.inv.includes('mop')) g.inv.push('mop'); // Mop rejoins via the laundry chute
     if (n === 5 && g.flags.o2 == null) g.flags.o2 = 30;
+    if (n === 1 && opts.fresh) give('mop');
     E.clearTransient(); E.clearOverlays(); E.view = 'game'; E.$('gate').hidden = true; E.$('stage').hidden = false;
     E.setCheckpoint(); E.renderInv(); E.updateHud(); E.updateClockUI(); E.persist();
     if (n === 1) {
-      if (opts.fresh) { give('mop'); E.setCheckpoint(); say('The Luminous Hyacinth, fourteen months out. You wake up on a sack of absorbent granules in the Deck 9 supply closet because you are not crew and crew get bunks.'); say('Something has changed. The engine note is wrong, the corridor door is sealed, and Mop, the floor-polishing robot, is standing over you saying "Wim! Wim! I signed for a delivery!"'); say('Click a verb, then click something in the room. Or type commands like LOOK AT MOP. Save often. This is that kind of ship.'); }
+      if (opts.fresh) { say('The Luminous Hyacinth, fourteen months out. You wake up on a sack of absorbent granules in the Deck 9 supply closet because you are not crew and crew get bunks.'); say('Something has changed. The engine note is wrong, the corridor door is sealed, and Mop, the floor-polishing robot, is standing over you saying "Wim! Wim! I signed for a delivery!"'); say('Click a verb, then click something in the room. Or type commands like LOOK AT MOP. Save often. This is that kind of ship.'); }
       return;
     }
     (OPEN[n] || []).forEach(t => say(t));

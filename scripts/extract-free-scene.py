@@ -3,7 +3,7 @@ The legacy Port Lucky path reads only the accepted c508239 frozen HTML.
 --game mop-galaxy delegates reviewed Scene 1 slices and read-only --check.
 """
 from pathlib import Path
-import subprocess, json, argparse, sys
+import subprocess, json, argparse, sys, re
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description='Extract a game-specific free scene.')
 parser.add_argument('--game', choices=['port-lucky', 'mop-galaxy'], default='port-lucky')
@@ -176,13 +176,24 @@ head = "import {installContextInput, contextTap} from '../../context-input.js';\
 # Shared gameplay UI imports no protected content. Demo contract is Scene 1 only.
 head = "import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';\n"+head
 code = code.replace("const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];", '')
-scene1 = {'1': {'objective':'Get your bearings after last night and find a way out of the honeymoon suite.', 'keys':['feed','arm','minibar','crackers','ticket','tuba','desk','door']}}
+scene1 = {'1': {'max':25,'name':'The Honeymoon Suite','objective':'Get your bearings after last night and find a way out of the honeymoon suite.', 'keys':['feed','arm','minibar','crackers','ticket','tuba','desk','door']}}
 points1 = {'feed':5,'arm':1,'minibar':2,'crackers':2,'ticket':5,'tuba':2,'desk':3,'door':5}
 head += 'const SCENES='+json.dumps(scene1)+';\nconst SCENE_POINTS='+json.dumps(points1)+';\n'
 code = code.replace('context=installContextInput(inputEngine);', 'context=installContextInput(inputEngine);\nconst gameplay=installGameplayControls(inputEngine,SCENES);')
 code = code.replace('function render() { context?.check();', 'function render() { context?.check();inputEngine.gameplay?.check();')
 code = code.replace('`Score: ${game.score} of 250`', 'scoreDisplay({...game,chapter:1},SCENES,SCENE_POINTS)')
 code = code.replace('unsubContext?.();', 'unsubContext?.();gameplay.destroy();')
+code = code.replace('if (walkTarget) {', "if (walkTarget && !$('modalRoot').children.length) {")
+head = "import {installSceneRuntime, captureScene, showSceneConfirmation, saveGameplay} from '../../scene-history.js';\n" + head
+head = head.replace('let game=initial.save ? structuredClone(initial.save) : newGame(), deathSnap;', "let game=initial.save ? structuredClone(initial.save) : newGame(), deathSnap;\n Object.assign(game,{v:2,chapter:1,ownerId:account.id,clock:null,done:false});")
+head = re.sub(r' function persist\(\).*?\n function toast', " function persist(){if(disposed || paused)return;clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveNow(),800);}\n function saveNow(keepalive=false){return saveGameplay(inputEngine,inputEngine.sceneConfig,keepalive);}\n function toast", head, flags=re.S)
+code = code.replace('get game(){return game;}, get view(){return view;}', 'get game(){return game;}, set game(v){game=v;}, get view(){return view;}')
+code = code.replace('get paused(){return paused;},', 'get paused(){return paused;}, set paused(v){paused=v;if(!v && pendingFrame && live)requestAnimationFrame(pendingFrame);},')
+code = code.replace('root:body, modal, $, activeSpots,', "get saveTimer(){return saveTimer;},set saveTimer(v){saveTimer=v;},\n setSaveState(s){this.saveState=s;$('saveStatus').textContent=s==='saving'?'Saving…':s==='saved'?'Saved':s==='failed'?'Save failed. Retry or reload.':'';},\n clearTransient(){context?.clear();msgQueue=[];msgOpen=false;blocking=false;walkTarget=null;walkThen=null;selItem=null;bgKey='';deathSnap=null;},\n clearOverlays(){root.querySelectorAll('#view .sierra,#view .overlay-card,.modal-veil').forEach(n=>n.remove());blocking=false;msgOpen=false;},\n updateHud,updateClockUI(){},script:{onRestart(){say('You wake up face-down on the carpet. Again. The goat watches you with mild interest.');}},\n root:body, modal, $, activeSpots,")
+code = code.replace('const gameplay=installGameplayControls(inputEngine,SCENES);', "installSceneRuntime(inputEngine,{id:GAME_ID,scenes:SCENES,rooms:ROOMS,items:ITEMS,roomChapter:{suite:1},completedFlag:'leftSuite'});\nconst gameplay=installGameplayControls(inputEngine,SCENES);")
+code = code.replace('if(!game.started){game.started=true;persist();', 'if(!game.started){game.started=true;captureScene(game,inputEngine.sceneConfig);persist();')
+code = re.sub(r'function restartScene\(\)\{.*?\n\}', 'function restartScene(){showSceneConfirmation(inputEngine,1,inputEngine.sceneConfig);\n}', code, flags=re.S)
+code = code.replace('async flush(){clearTimeout(saveTimer);if(saving)await saving;while(pendingSave){await saveNow(false);if(saving)await saving;}}', 'async flush(){await saveNow(false);}')
 # No paid content or hint calls can survive extraction.
 for word in ['garage','drawTruck','Pawn receipt','revealHint','listHints','platform.js']:
  assert word not in code, word

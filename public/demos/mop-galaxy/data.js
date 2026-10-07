@@ -17,6 +17,7 @@ export const ITEMS = {
   wrench:   { name: 'Adjustable wrench', color: 7, words: ['wrench','spanner','tool'], look: 'The closet\'s one real tool. It was holding the shelf up.' },
   granules: { name: 'Absorbent granules', color: 14, words: ['granules','grit','absorbent','sand'], look: 'A handful of the stuff you pour on spills. Turns liquid into something you can sweep.' },
 };
+export const CHAPTERS = [{n:1,title:'Deck 9, Custodial'}];
 export const ROOM_CHAPTER = {closet:1, deck9:1};
 export const PUZZLES = {
   closet: [

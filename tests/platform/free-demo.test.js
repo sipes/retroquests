@@ -12,27 +12,39 @@ test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no 
  assert.equal(demo.split(safeImport).length,2);
  const gameplayImport="import {VERBS, installGameplayControls, scoreDisplay} from '../../gameplay-controls.js';\n";
  assert.equal(demo.split(gameplayImport).length,2);
- assert.doesNotMatch(demo.replace(safeImport,'').replace(gameplayImport,''),/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
+ const historyImport="import {installSceneRuntime, captureScene, showSceneConfirmation, saveGameplay} from '../../scene-history.js';\n";
+ assert.equal(demo.split(historyImport).length,2);
+ assert.doesNotMatch(demo.replace(safeImport,'').replace(gameplayImport,'').replace(historyImport,''),/garage|drawTruck|garageAct|Pawn receipt|CHAPTER_START|revealHint|listHints|\/games\/|\bimport\s/);
  const marker='\n// Approved presentation-only contextual actions (mobile-context-v1).\n';
  for(const file of readdirSync('public/games/port-lucky')){
   let expected=execFileSync('git',['show','ecae4de:public/games/port-lucky/'+file],{encoding:'utf8'});
   let actual=readFileSync('public/games/port-lucky/'+file,'utf8');
   if(file==='rooms.js'){assert.equal(actual.split(marker).length,2);actual=actual.split(marker)[0];}
   if(file==='engine.js'){
+   actual=actual.replace("import {installSceneRuntime, allocateSceneScores} from '../../scene-history.js';\n",'')
+    .replace(/^allocateSceneScores\(.*\);\n/m,'')
+    .replace('    installSceneRuntime(this,{id:GAME_ID,scenes:SCENES,rooms:ROOMS,items:ITEMS,roomChapter:ROOM_CHAPTER});\n','')
+    .replace('if(this.rewindPending)return; ','').replace('history:this.game.history, ','').replace('this.clearTransient(); this.lastSnap=null;','this.clearTransient();');
+   actual=actual.replace('&& !this.blocking && !this.modalCount','&& !this.blocking');
    // Strip only the named gameplay-A presentation contract. Pin the rest exactly.
    actual=actual.replace(/import \{VERBS, installGameplayControls, scoreDisplay\} from '\.\.\/\.\.\/gameplay-controls\.js';\nexport const SCENES = [\s\S]*?;\n/,"const VERBS = [['walk','Walk'],['look','Look'],['take','Take'],['use','Use'],['talk','Talk']];\n")
     .replace(' this.wire(); installGameplayControls(this, SCENES);',' this.wire();')
     .replace('unmount() { this.gameplay?.destroy();','unmount() {')
     .replace('this.context?.check(); this.gameplay?.check();','this.context?.check();')
-    .replace('scoreDisplay(g, SCENES, POINTS)','`Score: ${g.score} of ${MAX_SCORE}`');
+    .replace('scoreDisplay(g, SCENES, POINTS, MAX_SCORE)','`Score: ${g.score} of ${MAX_SCORE}`');
    // Exact approved plumbing only; all parser, dispatch, save and story bytes stay pinned.
    expected=safeImport+expected;
+   expected=expected.replace(/  snapshot\(\) \{[\s\S]*?\n  clearTransient\(\)/,'  // snapshot/setCheckpoint/restartScene are installed by the shared history contract.\n  clearTransient()');
+   expected=expected.replace(/  flushSave\(keepalive\) \{[\s\S]*?\n  setSaveState\(s\)/,'  // flushSave is installed by the shared history contract (serial acknowledgement barrier).\n  setSaveState(s)');
    expected=expected.replace('    this.wire();','    installContextInput(this); this.wire();');
    for(const sig of ['async refreshState() {','clearTransient() {','clearOverlays() {','say(text, then) {','die(text) {','overlay(html) {','modal(html) {','gotoRoom(id, px, py, dir) {','parse(raw) {','openDrawer() {','choose(prompt, options) {'])expected=expected.replace(sig,sig+' this.context?.clear();');
    expected=expected.replace('unmount() {','unmount() { this.context?.destroy();').replace('render(t) {','render(t) { this.context?.check();');
    expected=expected.replace('  onCanvasClick(e) {','  onCanvasTap(e) { return contextTap.call(this, e); }\n  contextDrawerOpen() { return this.$ && !this.$(\'drawer\').hidden; }\n  onCanvasClick(e) {');
+   expected=expected.replace("    const close = () => { if (!v.isConnected) return; v.remove(); this.modalCount--; document.removeEventListener('keydown', esc); this.refocus(); };", "    const cleanup = () => { document.removeEventListener('keydown', esc); observer.disconnect(); };\n    const close = () => { cleanup(); if (!v.isConnected) return; v.remove(); this.modalCount--; this.refocus(); };")
+    .replace("    const esc = e => { if (e.key === 'Escape') close(); };", "    const esc = e => { if (e.key === 'Escape') close(); };\n    const observer = new MutationObserver(() => { if (!v.isConnected) cleanup(); });\n    observer.observe(this.container,{childList:true,subtree:true});");
    expected=expected.replace("$('exit').onclick = () => {", "$('exit').onclick = () => { this.context?.clear();");
   }
+  if(file==='script.js')expected=expected.replace('    g.checkpoint = CHAPTER_START(g.chapter);\n    g.checkpoint.hintsUsed = g.hintsUsed || 0;','').replace('  if (!g.checkpoint) g.checkpoint = CHAPTER_START(g.chapter);','');
   assert.equal(actual,expected,file);
  }
 });

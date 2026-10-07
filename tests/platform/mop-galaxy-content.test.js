@@ -18,7 +18,12 @@ const fresh=()=>({...DEMO.CHAPTER_START(1),ownerId:'synthetic-player'});
 const text=p=>readFileSync(p,'utf8');
 
 test('supplier story, puzzles, room geometry and procedural art are preserved',()=>{
-  for(const file of ['data.js','script.js']) assert.equal(text(join(owned,file)),text(join(supplied,'mop-galaxy',file)),file);
+  assert.equal(text(join(owned,'data.js')),text(join(supplied,'mop-galaxy','data.js')));
+  const approvedRuntime=text(join(supplied,'mop-galaxy','script.js'))
+    .replace('  if (!g.checkpoint) g.checkpoint = CHAPTER_START(g.chapter);','')
+    .replace('    E.clearTransient(); E.clearOverlays(); E.view',"    if (n === 1 && opts.fresh) give('mop');\n    E.clearTransient(); E.clearOverlays(); E.view")
+    .replace("if (opts.fresh) { give('mop'); E.setCheckpoint();",'if (opts.fresh) {');
+  assert.equal(text(join(owned,'script.js')),approvedRuntime,'only checkpoint migration/init changes; all puzzle logic pinned');
   // Approved mobile-context-v1 exception: append-only, non-spoiler action presentation.
   // Supplier rooms/geometry/visibility functions remain byte-identical before this marker.
   const rooms=text(join(owned,'rooms.js')), marker='\n// Approved presentation-only contextual actions (mobile-context-v1).\n';
@@ -45,7 +50,7 @@ test('Scene 1 extraction is deterministic, read-only --check and closed import g
     const source=text(path);
     assert.doesNotMatch(source,/4471|HANDLERS\.(cryo|gallery|bridge)|gumbo1|codecard|startChapter\(2\)|revealHint\(|listHints\(/,path);
     for(const match of source.matchAll(/\b(?:import|export)\s+(?:[^'"\n]*?\s+from\s*)?['"]([^'"]+)['"]/g)) {
-      if(['../../context-input.js','../../gameplay-controls.js'].includes(match[1])){assert.equal(path,join(demo,'engine.js'));assert.doesNotMatch(text(join(root,'public',match[1].split('/').pop())),/4471|gumbo1|codecard|HANDLERS\./);continue;}
+      if(['../../context-input.js','../../gameplay-controls.js','../../scene-history.js'].includes(match[1])){assert.ok([join(demo,'engine.js'),join(demo,'save.js')].includes(path));assert.doesNotMatch(text(join(root,'public',match[1].split('/').pop())),/4471|gumbo1|codecard|HANDLERS\./);continue;}
       assert.ok(match[1].startsWith('./'),match[1]); walk(resolve(dirname(path),match[1]));
     }
   }
@@ -88,7 +93,7 @@ async function browserFixture(t){
   const server=createServer((req,res)=>{
     const p=new URL(req.url,'http://localhost').pathname;
     if(p==='/'){res.setHeader('content-type','text/html');res.end('<!doctype html><div id="port" class="pl-game"><button>Port Lucky sentinel</button></div><div id="game"></div>');return;}
-    if(!['/context-input.js','/gameplay-controls.js'].includes(p) && !/^\/((games|demos)\/mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
+    if(!['/context-input.js','/gameplay-controls.js','/scene-history.js'].includes(p) && !/^\/((games|demos)\/mop-galaxy)\/[a-z-]+\.(js|css)$/.test(p)){res.writeHead(404);res.end();return;}
     const path=join(root,'public',p);if(!existsSync(path)){res.writeHead(404);res.end();return;}
     res.setHeader('content-type',p.endsWith('.css')?'text/css':'text/javascript');res.end(readFileSync(path));
   });
