@@ -132,7 +132,12 @@ function secureResponse(res, url) {
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options','nosniff'); h.set('Referrer-Policy','no-referrer'); h.set('X-Frame-Options','DENY');
   h.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
-  h.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  // Only the public portal may load the consent-gated Meta SDK. Admin/auth/API
+  // retain the original policy; do not broadly allow third-party trackers.
+  const metaPortal = ['/', '/index.html'].includes(url.pathname);
+  const metaScript = metaPortal ? ' https://connect.facebook.net' : '';
+  const metaNetwork = metaPortal ? ' https://www.facebook.com' : '';
+  h.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${metaScript}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:${metaNetwork}; connect-src 'self' https://challenges.cloudflare.com${metaNetwork}; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`);
   if(url.protocol === 'https:') h.set('Strict-Transport-Security','max-age=31536000');
   if (!/^\/icons\/[a-z0-9-]+\.png$/.test(url.pathname) && url.pathname !== '/manifest.webmanifest') h.set('Cache-Control','no-store');
   return new Response(res.body,{status:res.status,statusText:res.statusText,headers:h});
