@@ -8,17 +8,28 @@ const home=html.slice(html.indexOf('<main class="wrap" id="home">'),html.indexOf
 test('single accessible catalogue replaces duplicated intro, hero and game grid',()=>{
   assert.match(home,/<h1[^>]*>Choose your next misadventure<\/h1>/);
   assert.ok(home.indexOf('catalogueTitle')<home.indexOf('featuredTitle'));
-  assert.equal((home.match(/data-slide=/g)||[]).length,3);
+  assert.equal((home.match(/data-slide=/g)||[]).length,5);
   assert.doesNotMatch(home,/class="intro"|class="hero"|class="games"/);
   assert.match(home,/Your best mate is missing\. The wedding is at four\. There is a goat in your hotel suite, and nobody remembers why\./);
   for(const id of ['playCard','playMopCard','buyHero','heroCanvas','cover2','cover3'])assert.equal((home.match(new RegExp(`id="${id}"`,'g'))||[]).length,1);
   assert.match(home,/aria-roledescription="carousel"/);
   assert.match(home,/data-slide="mop-galaxy"[^>]*hidden inert/);
-  assert.match(home,/data-slide="crown"[^>]*hidden inert/);
+  for(const id of ['thistlemere','nine-miles','harrowgate'])assert.match(home,new RegExp(`data-slide="${id}"[^>]*hidden inert`));
+  const concepts=[...home.matchAll(/<article[^>]*data-slide="(thistlemere|nine-miles|harrowgate)"[^>]*>([\s\S]*?)<\/article>/g)];
+  assert.equal(concepts.length,3);
+  for(const [,id,body] of concepts){
+    assert.match(body,/width="320" height="180"/);
+    assert.match(body,/Concept screen mock-up · not playable yet/);
+    assert.match(body,/<span class="coming-status">Coming soon<\/span>/);
+    assert.doesNotMatch(body,/<button|<a\b|data-wish|data-price|data-progress/);
+  }
+  assert.equal((home.match(/data-dot /g)||[]).length,5);
+  assert.match(home,/1 \/ 5/);
+  assert.doesNotMatch(home,/stable-hand|three stolen treasures|Notifications unavailable/);
 });
 test('landing has honest demo, development and planned SKU-specific pricing',()=>{
   assert.match(home,/Eight-chapter adventure/);assert.match(home,/full-game sales are not available yet/);assert.doesNotMatch(home,/Coming 2027|2–3 hours|release gates|processed securely/);
-  assert.equal((home.match(/<span class="tag">In development<\/span>/g)||[]).length,1);
+  assert.equal((home.match(/<span class="tag">In development<\/span>/g)||[]).length,3);
   assert.match(home,/id="playMopCard">Play/);
   assert.match(home,/<button[^>]*id="buyHero" disabled>Full game · <span data-price="port-lucky">\$7\.99<\/span><\/button>/);
   assert.match(home,/data-price="port-lucky-walkthrough">\$1\.99/);
