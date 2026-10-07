@@ -18,9 +18,28 @@ export const carousel=createCarousel($('catalogue'),{blocked:()=>document.body.c
 const hostOptions={container:$('gameMount'),signUp,signIn,onState:()=>{refreshCatalogue().catch(()=>{});},onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}};
 const hosts={'port-lucky':createPortLuckyHost({...hostOptions,mount}),'mop-galaxy':createMopGalaxyHost({...hostOptions,mount:mountMop})};
 export let host=hosts[selectedGame];
-function showCatalogue(reason){if(reason==='access-changed' || reason==='signed-out')reader.invalidate();carousel.selectGame(selectedGame);refreshCatalogue().catch(e=>toast(e.message));document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
-let starting=null;
-function startGame(expectedOwner,gameId=selectedGame,{discardPending=false}={}){const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;starting=(async()=>{try{if(!Object.hasOwn(hosts,gameId))throw new Error('Unknown game');carousel.selectGame(gameId);carousel.pause();if(gameId!==selectedGame){await host.stop();selectedGame=gameId;host=hosts[gameId];}await refreshMe();if(guarded && (account?.id!==expectedOwner || !account?.verified || !allEntitlements.includes(gameId)))throw new Error('Account or game ownership changed. No automatic resume.');if(!account?.verified && gameId!=='mop-galaxy'){await signIn();return false;}document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;await host.start(guarded?expectedOwner:undefined,{discardPending});$('saveRecovery').hidden=true;return true;}catch(e){toast(e.message);if(host.handle){$('saveRecovery').hidden=false;return false;}await host.stop();showCatalogue();return false;}})().finally(()=>{starting=null;});return starting;}
+function cancelPurchase(){navigation++;purchaseReturn.cancel();}
+function showCatalogue(reason,{preservePurchase=false}={}){if(!preservePurchase)cancelPurchase();if(reason==='access-changed' || reason==='signed-out')reader.invalidate();carousel.selectGame(selectedGame);refreshCatalogue().catch(e=>toast(e.message));document.body.classList.remove('in-game');$('home').hidden=false;$('gameView').hidden=true;$('saveRecovery').hidden=true;window.scrollTo(0,0);}
+let starting=null,navigation=0;
+function startGame(expectedOwner,gameId=selectedGame,{discardPending=false,isCurrent}={}){
+ const guarded=typeof expectedOwner==='string';if(starting)return guarded?Promise.resolve(false):starting;
+ // Manual entry supersedes a checkout check, but retain its pending/error panel
+ // until entry really succeeds (a failed save or mount must remain recoverable).
+ if(!isCurrent){navigation++;purchaseReturn.cancel({clear:false});}
+ const generation=navigation,current=()=>generation===navigation && (!isCurrent || isCurrent());
+ starting=(async()=>{try{
+  if(!current())return false;
+  if(!Object.hasOwn(hosts,gameId))throw new Error('Unknown game');carousel.selectGame(gameId);carousel.pause();
+  if(gameId!==selectedGame){await host.stop();if(!current())return false;selectedGame=gameId;host=hosts[gameId];}
+  await refreshMe();if(!current())return false;
+  if(guarded && (account?.id!==expectedOwner || !account?.verified || !allEntitlements.includes(gameId)))throw new Error('Account or game ownership changed. No automatic resume.');
+  if(!account?.verified && gameId!=='mop-galaxy'){await signIn();return false;}
+  document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;
+  await host.start(guarded?expectedOwner:undefined,{discardPending});
+  if(!current()){await host.stop();return false;}
+  purchaseReturn.cancel();$('saveRecovery').hidden=true;return true;
+ }catch(e){if(current())toast(e.message);if(host.handle){$('saveRecovery').hidden=false;return false;}await host.stop();if(current())showCatalogue(undefined,{preservePurchase:true});return false;}})().finally(()=>{starting=null;});return starting;
+}
 export function refreshCatalogue(){if(authChanging)return Promise.resolve(null);return reader.refresh(async()=>{const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);return {user:me.user || null,entitlements:me.entitlements || [],save_envelopes:me.save_envelopes || {},catalog:me.catalog || c.catalog};});}
 async function refreshMe(){try{await host.refresh();}catch(e){if(e.code!=='STATE_CHANGED')throw e;}const s=await refreshCatalogue();if(!s)throw new Error('Account refresh superseded. Try again.');return s;}
 setInterval(()=>{if(!document.hidden && !document.body.classList.contains('in-game'))refreshCatalogue().catch(()=>{});},5000);
@@ -28,20 +47,21 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshCat
 window.addEventListener('focus',()=>refreshCatalogue().catch(()=>{}));
 function launch(gameId){const p=cataloguePresentation({user:account,entitlements:allEntitlements},gameId);return startGame(p.owned?account.id:undefined,gameId);}
 $('playCard').onclick=()=>launch('port-lucky');$('playMopCard').onclick=()=>launch('mop-galaxy');
-$('logoBtn').onclick=async()=>{try{await host.stop();showCatalogue();}catch(e){toast(e.message);$('saveRecovery').hidden=false;}};
+$('logoBtn').onclick=async()=>{cancelPurchase();try{await host.stop();showCatalogue();}catch(e){toast(e.message);$('saveRecovery').hidden=false;}};
 $('reloadSave').onclick=()=>{if(confirm('Discard pending progress and load the server save?'))startGame(undefined,selectedGame,{discardPending:true});};
 drawLandingArt();
 {const c=$('cover2').getContext('2d'),s={flags:{},inv:['mop']};c.save();mopDemoArt.closet.bg(c,s);for(const p of mopDemoArt.closet.props(c,s,0))p.d();drawWim(c,236,160,-1,0);c.restore();}
 const query=new URLSearchParams(location.search);
 const purchaseResult=query.get('purchase'),purchaseSku=query.get('sku');
 if(query.has('purchase') && ['port-lucky','port-lucky-walkthrough','mop-galaxy','mop-galaxy-walkthrough'].includes(purchaseSku))carousel.selectGame(purchaseSku.startsWith('mop-galaxy')?'mop-galaxy':'port-lucky');
-function purchaseStatus({text,retry=false,play=false}){carousel.pause();
+function purchaseStatus(value){if(!value){$('purchaseReturn')?.remove();return;}const {text,retry=false,play=false}=value;carousel.pause();
  let panel=$('purchaseReturn');if(!panel){panel=document.createElement('section');panel.id='purchaseReturn';panel.className='overlay-card';panel.setAttribute('aria-label','Purchase return');$('home').prepend(panel);}
  panel.replaceChildren();const message=document.createElement('p');message.setAttribute('role','status');message.textContent=text;panel.append(message);
  if(retry){const b=document.createElement('button');b.className='btn';b.textContent='Check ownership again';b.onclick=()=>purchaseReturn.run(purchaseResult,purchaseSku,{retry:true});panel.append(b);}
  if(play){const gameId=purchaseSku?.startsWith('mop-galaxy')?'mop-galaxy':'port-lucky';const b=document.createElement('button');b.className='btn ghost';b.textContent='Play / resume '+(gameId==='mop-galaxy'?'Mop & Galaxy':'Port Lucky');b.onclick=()=>startGame(undefined,gameId);panel.append(b);}
+ const back=document.createElement('button');back.className='btn ghost';back.textContent='Back to games';back.onclick=()=>$('logoBtn').click();panel.append(back);
 }
-export const purchaseReturn=createPurchaseReturn({read:refreshMe,resume:async(s,gameId)=>{if(!await startGame(s.user.id,gameId))throw new Error('Resume failed');},status:purchaseStatus});
+export const purchaseReturn=createPurchaseReturn({read:refreshMe,resume:async(s,gameId,{isCurrent})=>{if(!await startGame(s.user.id,gameId,{isCurrent}))throw new Error('Resume failed');},status:purchaseStatus});
 if(query.has('purchase') || query.has('signin'))history.replaceState(null,'',location.pathname);
 if(query.has('purchase')){purchaseReturn.run(purchaseResult,purchaseSku);if(purchaseResult!=='success' || ![SKU_GAME,SKU_WALK,'mop-galaxy','mop-galaxy-walkthrough'].includes(purchaseSku))refreshMe().catch(e=>toast(e.message));}
 else refreshMe().catch(e=>toast(e.message));
