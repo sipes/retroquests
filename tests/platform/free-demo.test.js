@@ -37,6 +37,7 @@ test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no 
    expected=expected.replace(/  snapshot\(\) \{[\s\S]*?\n  clearTransient\(\)/,'  // snapshot/setCheckpoint/restartScene are installed by the shared history contract.\n  clearTransient()');
    expected=expected.replace(/  flushSave\(keepalive\) \{[\s\S]*?\n  setSaveState\(s\)/,'  // flushSave is installed by the shared history contract (serial acknowledgement barrier).\n  setSaveState(s)');
    expected=expected.replace('    this.wire();','    installContextInput(this); this.wire();');
+   expected=expected.replace('restart.onclick = e => { e.stopPropagation(); box.remove(); this.restartScene(); };','restart.onclick = e => { e.stopPropagation(); this.restartScene(); };');
    for(const sig of ['async refreshState() {','clearTransient() {','clearOverlays() {','say(text, then) {','die(text) {','overlay(html) {','modal(html) {','gotoRoom(id, px, py, dir) {','parse(raw) {','openDrawer() {','choose(prompt, options) {'])expected=expected.replace(sig,sig+' this.context?.clear();');
    expected=expected.replace('unmount() {','unmount() { this.context?.destroy();').replace('render(t) {','render(t) { this.context?.check();');
    expected=expected.replace('  onCanvasClick(e) {','  onCanvasTap(e) { return contextTap.call(this, e); }\n  contextDrawerOpen() { return this.$ && !this.$(\'drawer\').hidden; }\n  onCanvasClick(e) {');

@@ -171,7 +171,7 @@ export class Engine {
     const restart = document.createElement('button'); restart.type = 'button'; restart.textContent = 'Restart scene';
     a.append(again, restart); box.appendChild(a);
     again.onclick = e => { if(this.rewindPending)return; e.stopPropagation(); box.remove(); const cp = this.game.checkpoint; this.game = Object.assign(JSON.parse(JSON.stringify(snap)), { history:this.game.history, checkpoint: cp, hintsUsed: this.game.hintsUsed, revealed: this.game.revealed }); this.clearTransient(); this.lastSnap=null; this.renderInv(); this.updateHud(); this.updateClockUI(); this.persist(); this.refocus(); };
-    restart.onclick = e => { e.stopPropagation(); box.remove(); this.restartScene(); };
+    restart.onclick = e => { e.stopPropagation(); this.restartScene(); };
     this.msgQueue = []; this.blocking = true; view.appendChild(box); again.focus();
   }
   overlay(html) { this.context?.clear(); const o = document.createElement('div'); o.className = 'overlay-card'; o.innerHTML = html; this.$('view').appendChild(o); this.blocking = true; return o; }

@@ -193,7 +193,7 @@ code = code.replace('root:body, modal, $, activeSpots,', "get saveTimer(){return
 code = code.replace('const gameplay=installGameplayControls(inputEngine,SCENES);', "installSceneRuntime(inputEngine,{id:GAME_ID,scenes:SCENES,rooms:ROOMS,items:ITEMS,roomChapter:{suite:1},completedFlag:'leftSuite'});\nconst gameplay=installGameplayControls(inputEngine,SCENES);")
 code = code.replace('if(!game.started){game.started=true;persist();', 'if(!game.started){game.started=true;captureScene(game,inputEngine.sceneConfig);persist();')
 code = re.sub(r'function restartScene\(\)\{.*?\n\}', 'function restartScene(){showSceneConfirmation(inputEngine,1,inputEngine.sceneConfig);\n}', code, flags=re.S)
-code = code.replace('async flush(){clearTimeout(saveTimer);if(saving)await saving;while(pendingSave){await saveNow(false);if(saving)await saving;}}', 'async flush(){await saveNow(false);}')
+code = code.replace('async flush(){clearTimeout(saveTimer);if(saving)await saving;while(pendingSave){await saveNow(false);if(saving)await saving;}}', 'async flush(){await saveNow(false);if(inputEngine.sceneOrdinaryError)throw inputEngine.sceneOrdinaryError;}')
 # No paid content or hint calls can survive extraction.
 for word in ['garage','drawTruck','Pawn receipt','revealHint','listHints','platform.js']:
  assert word not in code, word

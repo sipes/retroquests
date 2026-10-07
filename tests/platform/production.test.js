@@ -20,9 +20,9 @@ test('private routes never reach static fallback and Turnstile configuration mat
  assert.match(r.headers.get('content-security-policy'),/frame-src https:\/\/challenges.cloudflare.com/);
  assert.equal((await call(env,'/api/signup',{method:'POST',data:{name:'Player',email:'player@example.test'}})).status,503);
 });
-test('production configuration restricts approved sales to Sipes and runs Worker before all assets',()=>{
+test('production configuration permits approved public sales and runs Worker before all assets',()=>{
  const c=JSON.parse(readFileSync('wrangler.production.json'));
- assert.equal(c.assets.run_worker_first,true);assert.equal(c.vars.DEV_MODE,'0');assert.equal(c.vars.RELEASE_APPROVED,'1');assert.equal(c.vars.SALES_TEST_EMAILS,'cp@strategico.co.za');assert.equal(c.vars.CONTENT_APPROVED,'1');assert.equal(c.vars.PROVIDER_APPROVED,'1');assert.equal(c.workers_dev,false);assert.equal(c.preview_urls,false);
+ assert.equal(c.assets.run_worker_first,true);assert.equal(c.vars.DEV_MODE,'0');assert.equal(c.vars.RELEASE_APPROVED,'1');assert.equal(Object.hasOwn(c.vars,'SALES_TEST_EMAILS'),false);assert.equal(c.vars.CONTENT_APPROVED,'1');assert.equal(c.vars.PROVIDER_APPROVED,'1');assert.equal(c.workers_dev,false);assert.equal(c.preview_urls,false);
  assert.match(readFileSync('scripts/provision-production.py','utf8'),/'RELEASE_APPROVED':'0'/);
  assert.equal(c.vars.STRIPE_PRICE_PORT_LUCKY,'price_1UNArtEKHBH8mBfWqkjQF8Fn');
  const bridge=readFileSync('public/port-lucky-platform.js','utf8');assert.doesNotMatch(bridge,/^import .*games\//m);

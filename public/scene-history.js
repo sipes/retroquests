@@ -76,8 +76,9 @@ export function saveGameplay(e,c,keepalive) {
   };
   // Ordinary writes AND unload writes share the drain barrier. A rewind cannot
   // run until every dispatched old-timeline write has settled.
-  const result=(e.sceneSaveQueue || Promise.resolve()).then(run);
-  e.sceneSaveQueue=result.catch(()=>{});
+  const previous=e.sceneSaveQueue || Promise.resolve();
+  const result=keepalive ? run() : previous.then(run);
+  e.sceneSaveQueue=Promise.allSettled([previous,result]).then(()=>{});
   return result.catch(()=>{}); // existing UI retry contract; rewind checks failure
 }
 export async function rewindScene(e,chapter,c) {

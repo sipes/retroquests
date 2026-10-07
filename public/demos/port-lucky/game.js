@@ -649,7 +649,7 @@ const unsubContext=adapter.subscribe?.(()=>context.clear());
 startGame();if(initial.save)$('saveStatus').textContent='Loaded server progress';requestAnimationFrame(render);
 return {root:shell,get state(){return structuredClone(game);}, refresh:()=>{context.clear();return adapter.getState();},
  pause(){context.clear();paused=true;globalThis.cancelAnimationFrame(raf);return ()=>{paused=false;if(!live)return;if(pendingFrame)requestAnimationFrame(pendingFrame);for(const fn of pausedTimers.splice(0))setTimeout(fn,0);};},
- async flush(){await saveNow(false);},
+ async flush(){await saveNow(false);if(inputEngine.sceneOrdinaryError)throw inputEngine.sceneOrdinaryError;},
  unmount(){if(disposed)return;context.destroy();unsubContext?.();gameplay.destroy();disposed=true;exitImmersive();live=false;globalThis.cancelAnimationFrame(raf);
  for(const id of timers)globalThis.clearTimeout(id);for(const args of listeners)globalThis.document.removeEventListener(...args);
  window.removeEventListener('pagehide',pagehide);root.querySelectorAll('[data-a="close"]').forEach(b=>b.click());root.replaceChildren();}
