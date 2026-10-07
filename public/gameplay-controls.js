@@ -61,6 +61,22 @@ export function installGameplayControls(engine, scenes) {
     const existing=ids.map(get);existing.forEach((b,i)=>{if(!b)return;b.dataset.rqUtility=['stuck','restart','exit','items'][i];b.setAttribute('aria-label',['Stuck?','Restart scene','Exit game','Items'][i]);b.title=b.getAttribute('aria-label');const icon=doc.createElement('span');icon.textContent=['?','↻','←','▣'][i];icon.setAttribute('aria-hidden','true');b.prepend(icon);});
     rail.replaceChildren(mute,objective,...existing.filter(Boolean));
   }
+  // Move the same controls, not copies: preserve handlers, audio and mobile order.
+  const desktop=win.matchMedia('(pointer:fine)');
+  const hover=host.querySelector('.hover-label');
+  const placeUtilities=()=>{
+    if(!rail || !top)return;
+    if(desktop.matches){top.prepend(mute,objective);}
+    else rail.prepend(mute,objective);
+    if(hover){if(desktop.matches)hover.tabIndex=0;else hover.removeAttribute('tabindex');}
+  };
+  placeUtilities();listen(desktop,'change',placeUtilities);
+  // Keep overflowing target text available when moving into its scroll area.
+  // Elsewhere the engine's normal pointer-leave clearing remains unchanged.
+  if(hover){
+    listen(engine.cv,'mouseleave',ev=>{if(desktop.matches && ev.relatedTarget && hover.contains(ev.relatedTarget))ev.stopImmediatePropagation();},true);
+    listen(hover,'mouseleave',ev=>{if(desktop.matches && ev.relatedTarget!==engine.cv)hover.textContent='';});
+  }
   mute.onclick=async()=>{await music.toggle(active(),hidden());controller.updateMute();};
   objective.onclick=()=>{
     if(!engine.game || engine.view!=='game' || engine.destroyed || engine.paused)return;
@@ -73,7 +89,14 @@ export function installGameplayControls(engine, scenes) {
   .rq-nonrail{min-width:44px;min-height:44px}.rq-utilities{display:flex;gap:6px}.rq-utilities button{min-height:44px}
   .pl-game .side-actions,.demo-shell .side-actions{display:flex;gap:6px;grid-column:1/-1}
   .pl-game .side-actions>[data-rq-utility],.demo-shell .side-actions>[data-rq-utility]{min-height:44px}
-  @media (pointer:fine){.side-actions>[data-rq-utility]:not([data-rq-utility=mute]):not([data-rq-utility=objective]){display:none}}
+  @media (pointer:fine){
+    .pl-game .side-actions,.demo-shell .side-actions{display:none}
+    .pl-game .rq-nonrail,.demo-shell .rq-nonrail,.pl-game [data-id=fsTop],.demo-shell #fsTopBtn{display:none!important}
+    .pl-game .game-top [data-rq-utility],.demo-shell .game-top [data-rq-utility]{min-height:44px}
+    /* Two readable lines, stable even when empty. Exceptional labels scroll rather
+       than clipping or moving the action/inventory panels. No spoken placeholder. */
+    .pl-game .hover-label,.demo-shell .hover-label{display:block!important;box-sizing:border-box;height:56px;min-height:56px;max-height:56px;line-height:26px;padding:4px 2px 0;white-space:normal;overflow:auto;overflow-wrap:anywhere;scrollbar-gutter:stable}
+  }
   @media (pointer:coarse){
     .pl-game .pl-stage,.demo-shell #gameView{display:grid!important;grid-template-columns:minmax(0,1fr) 48px!important;gap:6px!important;height:auto!important;min-height:0;padding:4px max(4px,env(safe-area-inset-right,0px)) 4px max(4px,env(safe-area-inset-left,0px));box-sizing:border-box}
     .pl-game .game-top,.demo-shell .game-top,.demo-shell.in-game .game-top{display:flex!important;grid-column:1/-1;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px;margin:0!important}
