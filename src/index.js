@@ -212,12 +212,18 @@ async function me(req, env) {
 async function signup(req, env, url) {
   const b = await body(req);
   const email = cleanEmail(b.email), name = cleanName(b.name);
+  let gameId = null;
+  if (b.free_play !== undefined) {
+    if (b.free_play !== true || b.terms_accepted !== true) throw new HttpError(400, 'Accept the free-account terms to continue. No purchase or marketing consent is implied.');
+    if (!Object.hasOwn(PUBLIC_GAMES, b.game_id) || PUBLIC_GAMES[b.game_id].available !== true || !Object.hasOwn(GAMES, b.game_id)) throw new HttpError(400, 'Choose a public playable game.');
+    gameId = b.game_id;
+  } else if (b.game_id !== undefined) throw new HttpError(400, 'Free-play intent must be explicit.');
   await authProtection(req,env,url,email,b);
   const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
   if (existing) {
     await attributionStatement(env,existing.id,b.referral_id).run();
     // Never hand out a session for an existing email: send a sign-in link instead.
-    const dev = await sendLoginLink(env, url, existing, 'login');
+    const dev = await sendLoginLink(env, url, existing, 'login', gameId);
     return json({ status: 'link_sent', ...dev });
   }
   const id = crypto.randomUUID();
@@ -226,7 +232,7 @@ async function signup(req, env, url) {
     attributionStatement(env,id,b.referral_id,email)
   ]);
   const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
-  const dev = await sendLoginLink(env, url, user, 'welcome');
+  const dev = await sendLoginLink(env, url, user, user.id === id ? 'welcome' : 'login', gameId);
   return json({ status: 'link_sent', ...dev });
 }
 
@@ -245,13 +251,15 @@ async function requestLogin(req, env, url) {
   return json({ status: 'link_sent', ...dev });
 }
 
-async function sendLoginLink(env, url, user, kind) {
-  const recent = await env.DB.prepare("SELECT created_at FROM email_log WHERE to_email = ? AND kind IN ('login','welcome') AND status='accepted' AND created_at > ? ORDER BY created_at DESC LIMIT 1")
-    .bind(user.email, now() - EMAIL_COOLDOWN_SECONDS).first();
+async function sendLoginLink(env, url, user, kind, gameId = null) {
+  const recent = await env.DB.prepare("SELECT created_at FROM email_log WHERE to_email = ? AND kind IN ('login','welcome') AND status='accepted' AND created_at > ? AND EXISTS(SELECT 1 FROM login_tokens WHERE user_id=? AND game_id IS ? AND used_at IS NULL AND expires_at>?) ORDER BY created_at DESC LIMIT 1")
+    .bind(user.email, now() - EMAIL_COOLDOWN_SECONDS,user.id,gameId,now()).first();
+  // Suppress an already-usable link for this exact intent. Never mutate an
+  // issued link: another game request must not hijack its selected game.
   if (recent) return {};
   const token = randomToken();
-  await env.DB.prepare('INSERT INTO login_tokens (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(token), user.id, now(), now() + LOGIN_LINK_MINUTES * 60).run();
+  await env.DB.prepare('INSERT INTO login_tokens (token_hash, user_id, created_at, expires_at, game_id) VALUES (?, ?, ?, ?, ?)')
+    .bind(await sha256(token), user.id, now(), now() + LOGIN_LINK_MINUTES * 60, gameId).run();
   const link = `${url.origin}/auth/link?token=${encodeURIComponent(token)}`;
   const mail = kind === 'welcome' ? emails.welcome(env, user, link) : emails.login(env, user, link, LOGIN_LINK_MINUTES);
   const accepted = await deliver(env, user, kind, mail);
@@ -282,7 +290,8 @@ async function useLoginLink(req, env, url) {
     env.DB.prepare('UPDATE users SET verified_at=COALESCE(verified_at,?),last_seen_at=? WHERE id=? AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(now(),now(),row.user_id,sh)
   ]);
   if(!results[0].meta.changes) return Response.redirect(`${url.origin}/?signin=expired`,302);
-  return new Response(null, { status: 302, headers: { location: `${url.origin}/?signin=ok`, 'set-cookie': sessionCookie(url, session, SESSION_DAYS * DAY) } });
+  const intent = row.game_id && Object.hasOwn(PUBLIC_GAMES,row.game_id) && PUBLIC_GAMES[row.game_id].available === true && Object.hasOwn(GAMES,row.game_id) ? `&play=${encodeURIComponent(row.game_id)}` : '';
+  return new Response(null, { status: 302, headers: { location: `${url.origin}/?signin=ok${intent}`, 'set-cookie': sessionCookie(url, session, SESSION_DAYS * DAY) } });
 }
 
 async function logout(req, env) {

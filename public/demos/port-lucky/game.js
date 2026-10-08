@@ -583,9 +583,9 @@ function showPaywall() {
   const canBuy = !!catalog[SKU_GAME]?.sale_enabled;
   document.querySelectorAll('#view .overlay-card').forEach(n => n.remove());
   const o = overlay(`<div class="modal" role="dialog" aria-labelledby="pwT"><h3 id="pwT">End of the free scene</h3>
-    <p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Check the save status above before leaving.</p>
+    <p>Scene 1 complete. Unlock the entire game — all remaining scenes — for ${price(SKU_GAME)}, one-time. No recurring charge. Check the save status above before leaving.</p><p class="note">Walkthrough/clue pack is a separate optional add-on.</p>
     <div class="price-big">${price(SKU_GAME)}</div><p class="note">${canBuy ? 'One-time purchase. Secure card payment by Stripe.' : 'Purchases are currently unavailable for this account. You can return to games or replay the free scene.'}</p>
-    <div class="row"><button class="btn ghost" data-a="back">Back to games</button><button class="btn" data-a="buy">${canBuy ? 'Unlock full game' : 'Purchase unavailable'}</button></div></div>`);
+    <div class="row"><button class="btn ghost" data-a="back">Back to games</button><button class="btn" data-a="buy">Unlock full game — ${price(SKU_GAME)}</button></div></div>`);
   o.querySelector('[data-a=buy]').onclick = () => adapter.checkout(SKU_GAME).catch(e=>toast(e.message));
   o.querySelector('[data-a=back]').onclick = () => { o.remove(); blocking = false; showView('home'); };
   o.querySelector('[data-a=buy]').disabled=!canBuy; o.querySelector('[data-a=back]').focus();

@@ -93,6 +93,7 @@ ROOMS.closet.spots.find(s=>s.id==='shelves').actions.splice(1,0,{label:'Search',
     if engine.count(old) != 1:
         raise ValueError('Engine chapter boundary changed')
     engine = engine.replace(old, 'this.showPaywall();')
+    engine = engine.replace('    if (this.ent.game) { this.start(); return; }\n', '')
     engine = engine.replace("this.ent = { game: owned.includes(this.D.SKU_GAME), walk: owned.includes(this.D.SKU_WALK) };", 'this.ent = {game:false, walk:false};')
 
     game = """import {Engine} from './engine.js';

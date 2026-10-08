@@ -99,10 +99,10 @@ function restartScene(){game=newGame();game.started=true;msgQueue=[];walkTarget=
  renderInv();updateHud();persist();say('You wake up face-down on the carpet. Again. The goat watches you with mild interest.');
 }
 '''
-code += part(1255,1268).replace("<p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Your progress is saved.</p>", "<p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Check the save status above before leaving.</p>")
+code += part(1255,1268).replace("<p>Benny's still out there and the wedding is at four. Unlock the full game to keep playing. Your progress is saved.</p>", '<p>Scene 1 complete. Unlock the entire game — all remaining scenes — for ${price(SKU_GAME)}, one-time. No recurring charge. Check the save status above before leaving.</p><p class="note">Walkthrough/clue pack is a separate optional add-on.</p>')
 code=code.replace('function showPaywall() {', "function showPaywall() {\n  const canBuy = !!catalog[SKU_GAME]?.sale_enabled;")
 code=code.replace('One-time purchase. Secure card payment by Stripe.', "${canBuy ? 'One-time purchase. Secure card payment by Stripe.' : 'Purchases are currently unavailable for this account. You can return to games or replay the free scene.'}")
-code=code.replace('data-a="buy">Unlock full game', 'data-a="buy">${canBuy ? \'Unlock full game\' : \'Purchase unavailable\'}')
+code=code.replace('data-a="buy">Unlock full game', 'data-a="buy">Unlock full game — ${price(SKU_GAME)}')
 code=code.replace("() => checkout('game')", "() => adapter.checkout(SKU_GAME).catch(e=>toast(e.message))")
 code=code.replace("o.querySelector('[data-a=buy]').focus();", "o.querySelector('[data-a=buy]').disabled=!canBuy; o.querySelector('[data-a=back]').focus();")
 code += part(1279,1289) + part(1379,1399) + part(1514,1530)

@@ -35,7 +35,7 @@ function startGame(expectedOwner,gameId=selectedGame,{discardPending=false,isCur
   if(gameId!==selectedGame){await host.stop();if(!current())return false;selectedGame=gameId;host=hosts[gameId];}
   await refreshMe();if(!current())return false;
   if(guarded && (account?.id!==expectedOwner || !account?.verified || !allEntitlements.includes(gameId)))throw new Error('Account or game ownership changed. No automatic resume.');
-  if(!account?.verified && gameId!=='mop-galaxy'){await signIn();return false;}
+  if(!account?.verified){await freePlayEntry(gameId);return false;}
   document.body.classList.add('in-game');$('home').hidden=true;$('gameView').hidden=false;
   await host.start(guarded?expectedOwner:undefined,{discardPending});
   if(!current()){await host.stop();return false;}
@@ -66,10 +66,37 @@ function purchaseStatus(value){if(!value){$('purchaseReturn')?.remove();return;}
 export const purchaseReturn=createPurchaseReturn({read:refreshMe,resume:async(s,gameId,{isCurrent})=>{if(!await startGame(s.user.id,gameId,{isCurrent}))throw new Error('Resume failed');},status:purchaseStatus});
 if(query.has('purchase') || query.has('signin'))history.replaceState(null,'',location.pathname);
 if(query.has('purchase')){purchaseReturn.run(purchaseResult,purchaseSku);if(purchaseResult!=='success' || ![SKU_GAME,SKU_WALK,'mop-galaxy','mop-galaxy-walkthrough'].includes(purchaseSku))refreshMe().catch(e=>toast(e.message));}
-else refreshMe().catch(e=>toast(e.message));
+else refreshMe().then(()=>{const gameId=query.get('play');if(query.get('signin')==='ok' && Object.hasOwn(hosts,gameId) && account?.verified)return launch(gameId);}).catch(e=>toast(e.message));
 if(query.get('signin')==='expired')signIn();
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 /* ---------- Modals: sign-up, checkout, confirm ---------- */
+function freePlayEntry(gameId) {
+  let done; const promise=new Promise(r=>done=r);
+  const m=modal(`<form class="modal" novalidate role="dialog" aria-labelledby="entryTitle"><h3 id="entryTitle">Sign in or play free</h3>
+    <p>Enter your email to get a single-use sign-in link. If you are new, we create a free account. No purchase or marketing consent is implied.</p>
+    <div class="field"><label for="entryEmail">Email</label><input id="entryEmail" type="email" required autocomplete="email"></div>
+    <div id="entryDetails" hidden><div class="field"><label for="entryName">Name</label><input id="entryName" autocomplete="name" maxlength="60"></div>
+    <p class="note">We ask everyone for a name; it is only used for a new account. An existing account name will not change.</p>
+    <label><input type="checkbox" id="entryTerms"> I agree to a free account for scene 1 and cloud saves. No purchase, subscription or marketing signup.</label></div>
+    <div class="err" id="entryError" role="alert"></div><div class="row"><button type="button" class="btn ghost" id="entryCancel">Cancel</button><button type="submit" class="btn" id="entryGo">Continue</button></div></form>`,done);
+  const email=m.el.querySelector('#entryEmail'),details=m.el.querySelector('#entryDetails'),go=m.el.querySelector('#entryGo'),err=m.el.querySelector('#entryError');
+  email.focus();m.el.querySelector('#entryCancel').onclick=()=>m.close();
+  m.el.querySelector('form').onsubmit=async e=>{
+    e.preventDefault();err.textContent='';
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())){err.textContent='Enter an email address like name@example.com.';email.focus();return;}
+    if(details.hidden){details.hidden=false;go.textContent='Email me a link';m.el.querySelector('#entryName').focus();return;}
+    const name=m.el.querySelector('#entryName').value.trim(),terms=m.el.querySelector('#entryTerms').checked;
+    if(!name){err.textContent='Enter your name.';return;}
+    if(!terms){err.textContent='Agree to the free-account terms to continue.';return;}
+    go.disabled=true;go.textContent='Sending…';
+    try{
+      await api('POST','/api/signup',{email:email.value.trim(),name,free_play: true,game_id:gameId,terms_accepted:true,referral_id:query.get('ref'),turnstile_token:await authProof(m.el.querySelector('.modal'))});
+      m.el.querySelector('form').innerHTML='<h3>Check your email</h3><p>If your request was eligible, a single-use link was accepted. Open it within 30 minutes to verify and continue your selected game, on this or another device. Provider acceptance does not guarantee inbox delivery.</p><button type="button" class="btn" id="entryOK">OK</button>';
+      m.el.querySelector('#entryOK').onclick=()=>m.close();
+    }catch(x){err.textContent=x.message;go.disabled=false;go.textContent='Email me a link';}
+  };
+  return promise;
+}
 function modal(html, onClose) {
   const v = document.createElement('div'); v.className = 'modal-veil'; v.innerHTML = html;
   let closed=false;

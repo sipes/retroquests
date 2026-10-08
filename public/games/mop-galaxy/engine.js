@@ -222,7 +222,7 @@ export class Engine {
     await this.refreshState();
     if (this.$('drawer') && !this.$('drawer').hidden) this.renderDrawer();
   }
-  price(sku) { const p = this.catalog[sku]; return p ? '$' + (p.price_cents / 100).toFixed(2) : ''; }
+  price(sku) { return this.catalog[sku]?.display_price || 'Unavailable'; }
 
   // ---------- Game start / chapters ----------
   start() {
@@ -517,14 +517,15 @@ export class Engine {
     g.querySelector('[data-id="gateSignin"]').onclick = async () => { try { await this.adapter.signIn(); } catch (e) {} await this.refreshState(); this.start(); };
   }
   showPaywall() {
+    if (this.ent.game) { this.start(); return; }
     this.view = 'game'; this.$('gate').hidden = true; this.$('stage').hidden = false; this.updateHud();
     this.root.querySelectorAll('.overlay-card').forEach(n => n.remove());
     const o = this.overlay(`<div class="modal" role="dialog" aria-labelledby="pl-pwT"><h3 id="pl-pwT">End of the free scene</h3>
-      <p>${this.D.texts.paywall}</p>
-      <div class="price-big">${this.price(this.D.SKU_GAME)}</div><p class="note">One-time purchase. Secure card payment handled by the arcade.</p>
-      <div class="row"><button type="button" class="btn ghost" data-a="back">Back to games</button><button type="button" class="btn" data-a="buy">Unlock full game</button></div></div>`);
+      <p>Scene 1 complete. Unlock the entire game — all remaining scenes — for ${this.price(this.D.SKU_GAME)}, one-time. No recurring charge. Check the save status before leaving.</p><p class="note">Walkthrough/clue pack is a separate optional add-on.</p>
+      <div class="price-big">${this.price(this.D.SKU_GAME)}</div><p class="note">${this.catalog[this.D.SKU_GAME]?.sale_enabled === true ? 'One-time purchase. Secure card payment handled by the arcade.' : 'Purchases are currently unavailable for this account.'}</p>
+      <div class="row"><button type="button" class="btn ghost" data-a="back">Back to games</button><button type="button" class="btn" data-a="buy">Unlock full game — ${this.price(this.D.SKU_GAME)}</button></div></div>`);
     const buy = o.querySelector('[data-a=buy]'); buy.disabled = this.catalog[this.D.SKU_GAME]?.sale_enabled !== true;
-    if (buy.disabled) buy.textContent = 'Purchase unavailable';
+    if (buy.disabled) o.querySelector('.note').textContent += ' Purchases are currently unavailable for this account.';
     buy.onclick = () => this.checkout(this.D.SKU_GAME);
     o.querySelector('[data-a=back]').onclick = () => { o.remove(); this.blocking = false; if (this.options.onExit) this.options.onExit('paywall'); };
     o.querySelector('[data-a=back]').focus();
@@ -533,8 +534,9 @@ export class Engine {
     if (this.destroyed) return;
     if (!this.account) { try { await this.adapter.signUp(); } catch (e) {} await this.refreshState(); if (!this.account) return; }
     if (sku === this.D.SKU_WALK && !this.ent.game) sku = this.D.SKU_GAME;
+    if (this.ent.game && sku === this.D.SKU_GAME) { this.start(); return; }
     if (this.destroyed || this.catalog[sku]?.sale_enabled !== true) { this.toast('Purchases are currently unavailable for this account.'); return; }
-    const m = this.modal(`<div class="modal" role="dialog"><h3>Opening secure checkout…</h3><p>${this.price(sku)}</p><p class="note">You'll pay on the arcade's secure page, then come straight back here. Check the save status before leaving.</p><div class="err" data-id="coErr" role="alert"></div><div class="row"><button type="button" class="btn ghost" data-a="cancel">Cancel</button></div></div>`);
+    const m = this.modal(`<div class="modal" role="dialog"><h3>Opening secure checkout…</h3><p>${this.price(sku)}</p><p>${sku === this.D.SKU_GAME ? 'Unlock the entire game — all remaining scenes. One-time purchase. No recurring charge.' : 'Walkthrough/clue pack: a separate optional add-on, not full-game access.'}</p><p class="note">You'll pay on the arcade's secure page, then come straight back here. Check the save status before leaving.</p><div class="err" data-id="coErr" role="alert"></div><div class="row"><button type="button" class="btn ghost" data-a="cancel">Cancel</button></div></div>`);
     m.el.querySelector('[data-a=cancel]').onclick = () => m.close();
     try { await this.flushSave(false); if (this.destroyed || !m.el.isConnected) return; if (this.saveState === 'failed') throw this.lastSaveError; await this.adapter.checkout(sku); if (this.destroyed) return; m.close(); await this.onPlatformChange(); }
     catch (x) { const err = m.el.querySelector('[data-id="coErr"]'); if (err) err.textContent = (x && x.message) || 'Checkout could not be opened.'; }
@@ -568,8 +570,8 @@ export class Engine {
     const list = this.D.PUZZLES[g.room] || [];
     if (!this.ent.game || !this.ent.walk) {
       const l = document.createElement('div'); l.className = 'locked';
-      l.innerHTML = this.ent.game ? `<strong>The walkthrough is an add-on.</strong><span>It has a nudge, a clue and the full solution for every puzzle. Nothing is shown until you choose to reveal it.</span>` : `<strong>The walkthrough comes with the full game.</strong><span>Unlock ${this.D.texts.title} first, then add the walkthrough for ${this.price(this.D.SKU_WALK)}. Hints stay hidden until you choose to reveal them.</span>`;
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = this.ent.game ? `Add walkthrough · ${this.price(this.D.SKU_WALK)}` : `Unlock the full game · ${this.price(this.D.SKU_GAME)}`; b.onclick = () => this.checkout(this.D.SKU_WALK);
+      l.innerHTML = this.ent.game ? `<strong>The walkthrough is a separate optional add-on.</strong><span>It has a nudge, a clue and the full solution for every puzzle. Nothing is shown until you choose to reveal it.</span>` : `<strong>The walkthrough is a separate optional add-on.</strong><span>Unlock the entire ${this.D.texts.title} game — all remaining scenes — for ${this.price(this.D.SKU_GAME)}, one-time. No recurring charge. Then optionally add the walkthrough for ${this.price(this.D.SKU_WALK)}. Hints stay hidden until you choose to reveal them.</span>`;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = this.ent.game ? `Add walkthrough · ${this.price(this.D.SKU_WALK)}` : `Unlock full game — ${this.price(this.D.SKU_GAME)}`; b.disabled = this.catalog[this.ent.game ? this.D.SKU_WALK : this.D.SKU_GAME]?.sale_enabled !== true; b.onclick = () => this.checkout(this.D.SKU_WALK);
       l.appendChild(b); d.appendChild(l);
       const t = document.createElement('p'); t.className = 'sub'; t.textContent = `Puzzles in this scene: ${list.map(p => p.title).join(' · ')}`; d.appendChild(t); return;
     }

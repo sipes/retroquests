@@ -4,6 +4,7 @@ import {createPortLuckyAdapter,mountManaged} from '../../public/port-lucky-platf
 import {validDemoSave} from '../../public/demos/port-lucky/save.js';
 import {fixture,seed,call} from './helpers.js';
 import {runInNewContext} from 'node:vm';
+import {priorPurchasePresentation} from './approved-email-copy.js';
 const fresh=()=>({room:'suite',inv:[],flags:{},score:0,scored:{},revealed:{},hintsUsed:0,px:150,py:160});
 test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no paid content/imports/hints',()=>{
  const old=execFileSync('git',['show','c508239:public/index.html'],{encoding:'utf8'}),demo=readFileSync('public/demos/port-lucky/game.js','utf8');
@@ -21,6 +22,7 @@ test('safe demo contains byte-exact accepted suite drawing and puzzle logic, no 
   let actual=readFileSync('public/games/port-lucky/'+file,'utf8');
   if(file==='rooms.js'){assert.equal(actual.split(marker).length,2);actual=actual.split(marker)[0];}
   if(file==='engine.js'){
+   actual=priorPurchasePresentation(actual,'public/games/port-lucky/engine.js');
    actual=actual.replace("import {installSceneRuntime, allocateSceneScores} from '../../scene-history.js';\n",'')
     .replace(/^allocateSceneScores\(.*\);\n/m,'')
     .replace('    installSceneRuntime(this,{id:GAME_ID,scenes:SCENES,rooms:ROOMS,items:ITEMS,roomChapter:ROOM_CHAPTER});\n','')
@@ -58,7 +60,8 @@ test('generated free-demo paywall truthfully labels available and disabled purch
   const buy={},back={focus(){this.focused=true;}};let html,checkouts=0;
   runInNewContext(paywall+'showPaywall();',{catalog:{'port-lucky':{sale_enabled:enabled}},SKU_GAME:'port-lucky',document:{querySelectorAll:()=>[]},overlay:s=>{html=s;return {querySelector:s=>s.includes('buy')?buy:back};},price:()=>'$7.99',adapter:{checkout:async()=>{checkouts++;}},toast(){}});
   assert.equal(buy.disabled,!enabled);assert.equal(back.focused,true);assert.equal(checkouts,0);
-  assert.match(html,enabled?/Unlock full game/:/Purchase unavailable/);
+  assert.match(html,/Unlock full game — \$7\.99/);
+  assert.match(html,/entire game — all remaining scenes/);
   assert.match(html,enabled?/Secure card payment by Stripe/:/Purchases are currently unavailable for this account/);
   if(!enabled)assert.doesNotMatch(html,/Secure card payment by Stripe/);
  }
