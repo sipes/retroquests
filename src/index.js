@@ -2,7 +2,8 @@
 // Accounts (passwordless email links), cloud saves, Stripe payments,
 // Mailtrap emails, paid hints served from the server, and an admin API.
 
-import { CATALOG, GAMES } from './catalog.js';
+import { CATALOG, GAMES, PUBLIC_GAMES } from './catalog.js';
+import {shareLink,attributionStatement,rewardStatement,couponsFor,redeemCoupon} from './referrals.js';
 import {validHistory} from '../public/scene-history.js';
 import { sendEmail, emails } from './email.js';
 import { createCheckout, verifyStripeSignature } from './stripe.js';
@@ -52,7 +53,9 @@ async function route(req, env, ctx, url) {
   if (!p.startsWith('/api/') && !p.startsWith('/auth/')) return null;
   if (m !== 'GET' && m !== 'HEAD' && p !== '/api/stripe/webhook') checkSameOrigin(req, url);
 
-  if (p === '/api/config' && m === 'GET') return json({ catalog: publicCatalog(env), devMode: false, saleEnabled: saleEnabled(env), saveVersion: 1, turnstileSiteKey: env.TURNSTILE_SITE_KEY || null });
+  if (p === '/api/config' && m === 'GET') return json({ games: PUBLIC_GAMES, catalog: publicCatalog(env), devMode: false, saleEnabled: saleEnabled(env), saveVersion: 1, turnstileSiteKey: env.TURNSTILE_SITE_KEY || null });
+  if (p === '/api/referrals/share' && m === 'POST') { const b=await body(req);return json(await shareLink(env,await currentUser(req,env),String(b.game || ''),url.origin)); }
+  if (p === '/api/referrals/redeem' && m === 'POST') { const u=await requireUser(req,env),b=await body(req);await limit(env,'referral-redeem',u.id,30,60);return json(await redeemCoupon(env,u,b.coupon_id,String(b.game || ''))); }
   if (p === '/api/me' && m === 'GET') return me(req, env);
   if (p === '/api/signup' && m === 'POST') return signup(req, env, url);
   if (p === '/api/login' && m === 'POST') return requestLogin(req, env, url);
@@ -203,7 +206,7 @@ async function me(req, env) {
   const saveMap = {};
   const envelopes = {};
   for (const s of saves.results) { try { saveMap[s.game_id] = JSON.parse(s.data); envelopes[s.game_id] = {version:s.version,data:saveMap[s.game_id],revision:s.revision}; } catch {} }
-  return json({ user: userOut(u, env), entitlements: ents, saves: saveMap, save_envelopes: envelopes, catalog: publicCatalog(env, u) });
+  return json({ user: userOut(u, env), coupons: await couponsFor(env,u.id), entitlements: ents, saves: saveMap, save_envelopes: envelopes, catalog: publicCatalog(env, u) });
 }
 
 async function signup(req, env, url) {
@@ -212,14 +215,17 @@ async function signup(req, env, url) {
   await authProtection(req,env,url,email,b);
   const existing = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
   if (existing) {
+    await attributionStatement(env,existing.id,b.referral_id).run();
     // Never hand out a session for an existing email: send a sign-in link instead.
     const dev = await sendLoginLink(env, url, existing, 'login');
     return json({ status: 'link_sent', ...dev });
   }
   const id = crypto.randomUUID();
-  await env.DB.prepare('INSERT INTO users (id, email, name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, email, name, now(), now()).run();
-  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
+  await env.DB.batch([
+    env.DB.prepare('INSERT OR IGNORE INTO users (id, email, name, created_at, last_seen_at,referral_eligible) VALUES (?, ?, ?, ?, ?,1)').bind(id,email,name,now(),now()),
+    attributionStatement(env,id,b.referral_id,email)
+  ]);
+  const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
   const dev = await sendLoginLink(env, url, user, 'welcome');
   return json({ status: 'link_sent', ...dev });
 }
@@ -272,6 +278,7 @@ async function useLoginLink(req, env, url) {
   const results = await env.DB.batch([
     env.DB.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at) SELECT ?,user_id,?,? FROM login_tokens WHERE token_hash=? AND used_at IS NULL AND expires_at>?').bind(sh,now(),now()+SESSION_DAYS*DAY,row.token_hash,now()),
     env.DB.prepare('UPDATE login_tokens SET used_at=?,consumed_session=? WHERE token_hash=? AND used_at IS NULL AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(now(),sh,row.token_hash,sh),
+    rewardStatement(env,row.user_id,sh),
     env.DB.prepare('UPDATE users SET verified_at=COALESCE(verified_at,?),last_seen_at=? WHERE id=? AND EXISTS(SELECT 1 FROM sessions WHERE token_hash=?)').bind(now(),now(),row.user_id,sh)
   ]);
   if(!results[0].meta.changes) return Response.redirect(`${url.origin}/?signin=expired`,302);

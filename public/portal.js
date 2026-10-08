@@ -6,13 +6,15 @@ import {authProof} from './auth-proof.js';
 import {createPurchaseReturn} from './purchase-return.js';
 import {cataloguePresentation,createCatalogueReader} from './catalogue-state.js';
 import {createCarousel} from './catalogue-carousel.js';
+import {installSharing,renderCoupons} from './referrals.js';
+let referralGames={},coupons=[],sharingInstalled=false;
 const $=id=>document.getElementById(id);
 const SKU_GAME='port-lucky',SKU_WALK='port-lucky-walkthrough';
 let account=null,ent={game:false,walk:false},catalog={},authChanging=false;
 let selectedGame='port-lucky',allEntitlements=[];
 const escapeHtml=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(method,path,data){const r=await fetch(path,{method,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000),headers:data?{'content-type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const out=await r.json();if(!r.ok)throw Object.assign(new Error(out.error || 'Request failed'),{status:r.status});return out;}
-function applyState(s){s={...s,entitlements:s.entitlements || [],catalog:s.catalog || catalog};const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,allEntitlements])!==JSON.stringify([s.user,s.entitlements]);account=s.user;ent=next;allEntitlements=s.entitlements;catalog=s.catalog;for(const [gameId,button] of [['port-lucky','playCard'],['mop-galaxy','playMopCard']]){const p=cataloguePresentation(s,gameId);$(button).textContent=p.action;document.querySelector(`[data-progress="${gameId}"]`).textContent=p.progress;}if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');}
+function applyState(s){referralGames=s.games || referralGames;coupons=s.coupons || [];if(!sharingInstalled){sharingInstalled=true;installSharing({root:$('catalogue'),carousel,api,account:()=>account,signIn,games:referralGames});}s={...s,entitlements:s.entitlements || [],catalog:s.catalog || catalog};const next={game:s.entitlements.includes(SKU_GAME),walk:s.entitlements.includes(SKU_WALK)};const changed=JSON.stringify([account,allEntitlements])!==JSON.stringify([s.user,s.entitlements]);account=s.user;ent=next;allEntitlements=s.entitlements;catalog=s.catalog;for(const [gameId,button] of [['port-lucky','playCard'],['mop-galaxy','playMopCard']]){const p=cataloguePresentation(s,gameId);$(button).textContent=p.action;document.querySelector(`[data-progress="${gameId}"]`).textContent=p.progress;}if(changed || !$('nav').children.length){renderNav();$('acctMenu').hidden=true;$('acctMenu').replaceChildren();}document.querySelectorAll('[data-price]').forEach(el=>el.textContent=catalog[el.dataset.price]?.display_price || 'Unavailable');$('catalogue').dispatchEvent(new Event('referral-state'));}
 const reader=createCatalogueReader(applyState);
 export const carousel=createCarousel($('catalogue'),{blocked:()=>document.body.classList.contains('in-game') || !$('acctMenu').hidden || !!$('modalRoot').children.length || !!$('purchaseReturn')});
 const hostOptions={container:$('gameMount'),signUp,signIn,onState:()=>{refreshCatalogue().catch(()=>{});},onExit:showCatalogue,onError:e=>toast(e.message),onConflict:()=>{$('saveRecovery').hidden=false;}};
@@ -40,7 +42,7 @@ function startGame(expectedOwner,gameId=selectedGame,{discardPending=false,isCur
   purchaseReturn.cancel();$('saveRecovery').hidden=true;return true;
  }catch(e){if(current())toast(e.message);if(host.handle){$('saveRecovery').hidden=false;return false;}await host.stop();if(current())showCatalogue(undefined,{preservePurchase:true});return false;}})().finally(()=>{starting=null;});return starting;
 }
-export function refreshCatalogue(){if(authChanging)return Promise.resolve(null);return reader.refresh(async()=>{const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);return {user:me.user || null,entitlements:me.entitlements || [],save_envelopes:me.save_envelopes || {},catalog:me.catalog || c.catalog};});}
+export function refreshCatalogue(){if(authChanging)return Promise.resolve(null);return reader.refresh(async()=>{const [me,c]=await Promise.all([api('GET','/api/me'),api('GET','/api/config')]);return {games:c.games || {},coupons:me.coupons || [],user:me.user || null,entitlements:me.entitlements || [],save_envelopes:me.save_envelopes || {},catalog:me.catalog || c.catalog};});}
 async function refreshMe(){try{await host.refresh();}catch(e){if(e.code!=='STATE_CHANGED')throw e;}const s=await refreshCatalogue();if(!s)throw new Error('Account refresh superseded. Try again.');return s;}
 setInterval(()=>{if(!document.hidden && !document.body.classList.contains('in-game'))refreshCatalogue().catch(()=>{});},5000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshCatalogue().catch(()=>{});});
@@ -100,7 +102,7 @@ function signUp() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return err.textContent = 'Enter an email address like name@example.com.';
     const go = m.el.querySelector('#suGo'); go.disabled = true; go.textContent = 'Creating…';
     try {
-      const r = await api('POST', '/api/signup', { name, email, turnstile_token: await authProof(m.el.querySelector('.modal')) });
+      const r = await api('POST', '/api/signup', { name, email, referral_id:query.get('ref'), turnstile_token: await authProof(m.el.querySelector('.modal')) });
       {
         m.el.querySelector('form, .modal').innerHTML = `<h3>Check your email</h3><p>If your request was eligible, an email was accepted for ${escapeHtml(email)}. Open the single-use link to verify and sign in. Provider acceptance is not a guarantee of inbox delivery.</p><div class="row"><button class="btn" type="button" id="okBtn">OK</button></div>`;
         m.el.querySelector('#okBtn').onclick = () => m.close();
@@ -156,6 +158,7 @@ function renderMenu() {
     <div class="owned">Mop &amp; Galaxy: <b>${allEntitlements.includes('mop-galaxy') ? 'full game' : 'scene 1 (free)'}</b></div>
     <div class="owned">Mop walkthrough: <b>${allEntitlements.includes('mop-galaxy-walkthrough') ? 'owned' : 'not owned'}</b></div>`;
   if (account.isAdmin) { const a = document.createElement('a'); a.className = 'btn small alt'; a.href = '/admin.html'; a.textContent = 'Admin'; a.style.textDecoration = 'none'; m.appendChild(a); }
+  renderCoupons({root:m,coupons,games:referralGames,entitlements:allEntitlements,api,refresh:async()=>{await refreshCatalogue();renderMenu();m.hidden=false;$('nav').querySelector('[aria-expanded]')?.setAttribute('aria-expanded','true');}});
   const out = document.createElement('button'); out.className = 'btn small ghost'; out.textContent = 'Sign out';
   out.onclick = async () => {try {authChanging=true;reader.invalidate();await api('POST','/api/logout');authChanging=false;reader.invalidate();await refreshMe();m.hidden=true;toast('Signed out. Unsaved in-memory progress cleared.');} catch(e){toast(e.message);}finally{authChanging=false;refreshCatalogue().catch(()=>{});} };
   const del = document.createElement('button'); del.className = 'btn small ghost'; del.textContent = 'Delete my account';

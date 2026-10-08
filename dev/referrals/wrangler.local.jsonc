@@ -1,0 +1,6 @@
+{
+ "name":"retroquests-referrals-synthetic-local","main":"worker.js","compatibility_date":"2026-09-01",
+ "assets":{"directory":"../../public","binding":"ASSETS","run_worker_first":true},
+ "d1_databases":[{"binding":"DB","database_name":"retro-quest-db","database_id":"referrals-synthetic-local","migrations_dir":"../../migrations"}],
+ "vars":{"DEV_MODE":"0","CONTENT_APPROVED":"0","PROVIDER_APPROVED":"0","RELEASE_APPROVED":"0","MAILTRAP_TOKEN":"synthetic-local","MAILTRAP_INBOX_ID":"123","MAIL_FROM_EMAIL":"local@retroquests.test","TURNSTILE_SECRET":"synthetic-local","TURNSTILE_HOSTNAME":"localhost","TURNSTILE_SITE_KEY":"synthetic-local"}
+}

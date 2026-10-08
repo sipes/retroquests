@@ -2,6 +2,14 @@
 import { PORT_LUCKY_HINTS } from './games/port-lucky-hints.js';
 import { MOP_GALAXY_HINTS } from './games/mop-galaxy-hints.js';
 
+// Public carousel catalogue is separate from purchasable products and protected assets.
+export const PUBLIC_GAMES = {
+ 'port-lucky': {name:'Last Night in Port Lucky',available:true},
+ 'mop-galaxy': {name:'Mop & Galaxy',available:true},
+ thistlemere: {name:'Crown of Thistlemere',available:false},
+ 'nine-miles': {name:'Nine Miles to Nowhere',available:false},
+ harrowgate: {name:'The Harrowgate Will',available:false}
+};
 export const CATALOG = {
   'port-lucky': {
     name: 'Last Night in Port Lucky (full game)',
